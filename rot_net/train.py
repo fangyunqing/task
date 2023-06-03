@@ -40,7 +40,7 @@ if __name__ == "__main__":
                               cls_num=cls_num)
 
     # 数据加载器
-    num_workers = 1 if os.cpu_count() >> 1 == 0 else os.cpu_count() >> 1
+    num_workers = os.cpu_count()
     batch_size = 64
     train_dataloader = DataLoader(
         train_dataset,
@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
                 predict: Tensor = model(inputs)
 
-                total_val_loss += loss_func(predict, labels).mean().cpu().item()
+                total_val_loss += loss_func(predict, labels).cpu().item()
                 eval_batch_count += 1
 
         val_loss = total_val_loss / eval_batch_count
