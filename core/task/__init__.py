@@ -5,7 +5,6 @@
 
 __author__ = 'fyq'
 
-
 from .login_manager import LoginManager
 from .schedule_manager import ScheduleManager
 

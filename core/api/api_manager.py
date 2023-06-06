@@ -15,6 +15,24 @@ class ApiManager:
 
     def __init__(self):
         self._apis: List[Type[Api]] = api_cls_list
+        self._api_names = {api.api_name for api in self._apis}
+
+        def _query_seq_pairs(cls, quoter, pairs):
+            for key, val in pairs:
+                if isinstance(val, (list, tuple)):
+                    for v in val:
+                        if key in self._api_names:
+                            yield quoter(key)
+                        else:
+                            yield quoter(key) + "=" + quoter(cls._query_var(v))
+                else:
+                    if key in self._api_names:
+                        yield quoter(key)
+                    else:
+                        yield quoter(key) + "=" + quoter(cls._query_var(val))
+
+        import yarl
+        yarl.URL._query_seq_pairs = _query_seq_pairs
 
     def get_apis(self, task_type: str, api_type: str) -> Dict[str, Type[Api]]:
         apis: Dict[str, Type[Api]] = {}

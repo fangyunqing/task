@@ -15,8 +15,10 @@ torchaudio==2.0.2
 torchvision==0.15.2
 typing_extensions==4.5.0
 urllib3==2.0.2
-
 tqdm==4.65.0
 aiohttp==3.8.4
 loguru==0.7.0
 munch==3.0.0
+pycryptodome==3.18.0
+simplejson==3.19.1
+yarl==1.9.2

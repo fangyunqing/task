@@ -11,10 +11,10 @@ from aiohttp import ClientResponse
 
 from core import constant
 from core.api.abstract_api import AbstractApi
-from core.task import Task
-
-from core.util import guid
 from core.api.baidu.util import util1
+from core.api.baidu.util.jsonp import jsonp
+from core.util import guid
+from core.util.callback import random_callback
 
 
 class IndexApi(AbstractApi):
@@ -23,17 +23,18 @@ class IndexApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    def __init__(self, task: Task):
-        super(IndexApi, self).__init__(task)
-
     def _before(self):
         pass
 
-    def _after(self, response: ClientResponse) -> Tuple[bool, Optional[Dict]]:
+    async def _after(self, response: ClientResponse) -> Tuple[bool, Optional[Dict]]:
         pass
 
 
 class GetApiApi(AbstractApi):
+
+    def pre(self) -> Optional[str]:
+        return "index"
+
     url = "https://passport.baidu.com/v2/api/?getapi"
     method = constant.hm.get
     api_types = ['baidu']
@@ -57,6 +58,8 @@ class GetApiApi(AbstractApi):
             "processData": ""
         }
 
+        self.data = jsonp(params=params, process=process)
+        self.data[constant.kw.callback] = random_callback()
 
-    def _after(self, response: ClientResponse) -> Tuple[bool, Optional[Dict]]:
+    async def _after(self, response: ClientResponse) -> Tuple[bool, Optional[Dict]]:
         pass

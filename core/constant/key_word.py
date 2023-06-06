@@ -10,3 +10,5 @@ abstract = "Abstract"
 login = "login"
 schedule = "schedule"
 api = "api"
+
+callback = "callback"

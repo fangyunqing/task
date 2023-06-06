@@ -18,6 +18,7 @@ from core import constant
 from core.task.task import Task
 from core.api import Api
 from core.exception import TaskException
+from core.util.user_agent import random_ua
 
 logins_cls_list: List[Type[LoginTask]] = []
 schedule_cls_list: List[Type[ScheduleTask]] = []
@@ -55,6 +56,9 @@ class AbstractTask(Task):
     # 任务名称
     task_name: str = ""
 
+    # 会话
+    session: ClientSession = None
+
     def __init__(self, opt: Optional[Munch]):
         super(AbstractTask, self).__init__(opt=opt)
         self._logger = loguru.logger
@@ -64,7 +68,7 @@ class AbstractTask(Task):
 
     def __new__(cls, *args, **kwargs):
         assert cls is not AbstractTask
-        return super().__new__(cls, *args, **kwargs)
+        return super().__new__(cls)
 
     async def exec(self, session: ClientSession):
         next_api_name = self.first_api_name
@@ -117,14 +121,20 @@ class ScheduleTask(AbstractTask):
 
     async def exec(self, session: ClientSession):
         while True:
-            await super().exec(session)
+            await super().exec(session=session)
             await asyncio.sleep(self.repeat_time)
 
 
 class LoginTask(AbstractTask):
     """
-        登录任务
+    登录任务
     """
+
+    # header host
+    host = ""
+
+    # 来源
+    referer = ""
 
     def __new__(cls, *args, **kwargs):
         assert cls is not LoginTask
@@ -134,6 +144,18 @@ class LoginTask(AbstractTask):
         cls.task_type = constant.kw.login
         cls.task_name = cls.__name__.replace(cls.task_type.title(), "").lower()
         logins_cls_list.append(cls)
+
+    @property
+    def headers(self) -> Dict[str, Any]:
+        headers = {
+            "User-Agent": random_ua()
+        }
+        if self.host:
+            headers["Host"] = self.host
+        if self.referer:
+            headers["Referer"] = self.referer
+        headers["Accept-Encoding"] = "identity"
+        return headers
 
 
 class CombinationTask(Task):
@@ -153,5 +175,5 @@ class CombinationTask(Task):
     def __repr__(self):
         return f"{self.login_name}-{[_.task_sign for _ in self._st_cls_list]}"
 
-    async def exec(self, session: ClientSession):
-        await asyncio.wait([_(self.opt).exec(session=session) for _ in self._st_cls_list])
+    async def exec(self):
+        await asyncio.wait([_(self.opt).exec() for _ in self._st_cls_list])

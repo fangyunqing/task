@@ -42,7 +42,7 @@ class Api(ABC):
 
     # 需求传递的参数
     # post get
-    data: dict
+    data: dict = {}
 
     # 任务类型
     # login 登录
@@ -69,7 +69,7 @@ class Api(ABC):
         return f"{self.api_sign}:{self.method} {self.url}"
 
     def __init_subclass__(cls, **kwargs):
-        cls.api_name = cls.__name__.replace(constant.kw.api.title(), "", __count=1).lower()
+        cls.api_name = cls.__name__.replace(constant.kw.api.title(), "", 1).lower()
         if constant.kw.abstract.lower() not in cls.api_name:
             api_cls_list.append(cls)
 

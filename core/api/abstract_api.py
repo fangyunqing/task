@@ -39,7 +39,7 @@ class AbstractApi(Api):
         pass
 
     @abstractmethod
-    def _after(self, response: ClientResponse) -> Tuple[bool, Optional[Dict]]:
+    async def _after(self, response: ClientResponse) -> Tuple[bool, Optional[Dict]]:
         """
             后置处理
             判断请求的成功或者失败
@@ -51,10 +51,9 @@ class AbstractApi(Api):
     async def request(self, session: ClientSession) -> Tuple[bool, Optional[Dict]]:
 
         self._before()
-        self.task.debug(f"request {self.method} {self.url}")
 
         if self.method == hm.get:
-            response = await session.get(self.url, params=self.data)
+            response = await session.get(self.url, params=self.data, proxy="http://127.0.0.1:8888")
         elif self.method == hm.post_data:
             response = await session.post(self.url, data=self.data)
         elif self.method == hm.post_json:
@@ -72,7 +71,7 @@ class AbstractApi(Api):
                 raise ApiException(f"{self.api_sign}的方法{self.method}不支持")
             else:
                 raise ApiException(f"{self.api_sign}未设置方法")
+        res = await self._after(response)
+        response.close()
+        return res
 
-        text = await response.text()
-        self.task.debug(f"response {text}")
-        return self._after(response)

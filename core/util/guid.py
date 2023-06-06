@@ -14,4 +14,4 @@ def guid():
     :return:
     """
     s = str(uuid.uuid4()).upper()
-    return s[1: len(s)] + s[0]
+    return s[1: len(s)]

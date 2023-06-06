@@ -13,7 +13,14 @@ from core.task.abstract_task import LoginTask
 
 
 class BaiduLogin(LoginTask):
+
+    first_api_name = "getapi"
+
     api_types = ["baidu"]
+
+    host = "passport.baidu.com"
+
+    referer = "https://zhidao.baidu.com/"
 
     config = Munch({
         "sign1": Munch({

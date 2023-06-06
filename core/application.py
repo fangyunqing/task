@@ -33,7 +33,8 @@ class Application:
         self.lm = LoginManager()
         self.sm = ScheduleManager()
         self.opt: Munch = Munch({
-            "debug": False
+            "debug": True,
+            "proxy": False
         })
 
         for login_cls in self.lm:
@@ -50,14 +51,14 @@ class Application:
             else:
                 task = _(opt=self.opt)
             wait_task_list.append(self.lm.login_before_exec(login_name=task.login_name,
-                                                            task=task,
-                                                            session=aiohttp.ClientSession()))
+                                                            task=task))
         if wait_task_list:
             loop = asyncio.get_event_loop()
             loop.run_until_complete(asyncio.wait(fs=wait_task_list))
 
-    async def run_login(self, login_name: str):
-        pass
+    def run_login(self, login_name: str):
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.lm.run_login("baidu", self.opt))
 
 
 app = Application()
