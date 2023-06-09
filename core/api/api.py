@@ -78,7 +78,7 @@ class Api(ABC):
         pass
 
     @abstractmethod
-    async def request(self, session: ClientSession) -> Tuple[bool, Optional[Dict]]:
+    async def request(self, session: ClientSession) -> bool:
         pass
 
     @property

@@ -9,6 +9,7 @@ import time
 from typing import Any, Dict
 
 from core.api.baidu.util import util3
+from core.util.time import eleven_digits_time
 
 
 def jsonp(params: Dict[str, Any], process: Dict[str, Any]) -> Dict[str, Any]:
@@ -37,7 +38,7 @@ def jsonp(params: Dict[str, Any], process: Dict[str, Any]) -> Dict[str, Any]:
         "O0O000": "O0OOO0"
     }
 
-    var3 = int(time.time() * 1000) / 1000
+    var3 = eleven_digits_time() / 1000
     var4 = int(var3 / 86400) % 5
     var5 = list(var2.keys())
     _ = ""

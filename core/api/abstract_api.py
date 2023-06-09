@@ -12,7 +12,7 @@ from aiohttp import ClientSession, ClientResponse
 
 from core.api import Api
 from core.constant import hm
-from core.exception import ApiException
+from core.exception import ApiException, NotFoundApiException
 
 
 class AbstractApi(Api):
@@ -39,23 +39,22 @@ class AbstractApi(Api):
         pass
 
     @abstractmethod
-    async def _after(self, response: ClientResponse) -> Tuple[bool, Optional[Dict]]:
+    async def _after(self, response: ClientResponse) -> bool:
         """
             后置处理
             判断请求的成功或者失败
         :param response:
         :return:
         """
-        pass
 
-    async def request(self, session: ClientSession) -> Tuple[bool, Optional[Dict]]:
+    async def request(self, session: ClientSession) -> bool:
 
         self._before()
 
         if self.method == hm.get:
             response = await session.get(self.url, params=self.data, proxy="http://127.0.0.1:8888")
         elif self.method == hm.post_data:
-            response = await session.post(self.url, data=self.data)
+            response = await session.post(self.url, data=self.data, proxy="http://127.0.0.1:8888")
         elif self.method == hm.post_json:
             response = await session.post(self.url, json=self.data)
         elif self.method == hm.delete:
@@ -71,6 +70,8 @@ class AbstractApi(Api):
                 raise ApiException(f"{self.api_sign}的方法{self.method}不支持")
             else:
                 raise ApiException(f"{self.api_sign}未设置方法")
+
+        response.raise_for_status()
         res = await self._after(response)
         response.close()
         return res

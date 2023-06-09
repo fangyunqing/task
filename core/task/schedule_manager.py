@@ -7,14 +7,17 @@ __author__ = 'fyq'
 
 from typing import Dict, Type, List, Union
 
+from munch import Munch
+
 from core.task.abstract_task import ScheduleTask, CombinationTask
 
 
 class ScheduleManager:
 
-    def __init__(self):
+    def __init__(self, opt: Munch):
         self._schedules: Dict[str, List[Type[ScheduleTask]]] = {}
         self._real_task: List[Union[Type[ScheduleTask], CombinationTask]] = []
+        self._opt = opt
 
     def add_schedule(self,
                      login_name: str,

@@ -15,6 +15,7 @@ from aiohttp import ClientSession
 from munch import Munch
 
 from core import constant
+from core.account import Account
 from core.task.task import Task
 from core.api import Api
 from core.exception import TaskException
@@ -56,9 +57,6 @@ class AbstractTask(Task):
     # 任务名称
     task_name: str = ""
 
-    # 会话
-    session: ClientSession = None
-
     def __init__(self, opt: Optional[Munch]):
         super(AbstractTask, self).__init__(opt=opt)
         self._logger = loguru.logger
@@ -71,6 +69,9 @@ class AbstractTask(Task):
         return super().__new__(cls)
 
     async def exec(self, session: ClientSession):
+
+        self.config.user_agent = session.headers.get("User-Agent")
+
         next_api_name = self.first_api_name
         assert next_api_name is not None
         while True:
@@ -85,10 +86,16 @@ class AbstractTask(Task):
                 pre_api_cls: Type[Api] = self.apis.get(pre_api_name)
                 if pre_api_cls:
                     await pre_api_cls(task=self, config=self.config).request(session=session)
-            await current_api.request(session=session)
-            if current_api.stop or current_api.next() is None:
-                break
-            next_api_name = current_api.next()
+            res = await (current_api.request(session=session))
+            if not res:
+                next_api_name = current_api.request_if_fail()
+                if next_api_name is None:
+                    break
+            else:
+                if current_api.stop or current_api.next() is None:
+                    break
+                next_api_name = current_api.next()
+            await asyncio.sleep(1)
 
     @property
     def task_sign(self):
@@ -135,6 +142,14 @@ class LoginTask(AbstractTask):
 
     # 来源
     referer = ""
+
+    # 登录账户
+    account: Account = None
+
+    def __init__(self, opt: Optional[Munch], account: Account):
+        super(LoginTask, self).__init__(opt=opt)
+        self.account = account
+        self.config.account = account
 
     def __new__(cls, *args, **kwargs):
         assert cls is not LoginTask

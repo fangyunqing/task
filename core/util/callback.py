@@ -7,6 +7,9 @@ __author__ = 'fyq'
 
 import random
 import string
+import time
+
+from core.util.time import eleven_digits_time
 
 
 def random_callback(rule="??__???__??????"):
@@ -19,4 +22,16 @@ def random_callback(rule="??__???__??????"):
                 res += str(int(random.random() * 10))
         else:
             res += r
+    return res
+
+
+def jquery_random_call_back():
+    """
+    jQuery110207053490627294874_1680752947519
+    """
+    res = "jQuery"
+    for n in range(0, 21):
+        res += str(int(random.random() * 10))
+    res += f"_{eleven_digits_time()}"
+
     return res

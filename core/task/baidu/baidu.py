@@ -27,6 +27,13 @@ class BaiduLogin(LoginTask):
             "getApiInfo": {
                 "apiType": "class",
             },
+            "login": {
+                "isPhone": "isPhone",
+                "logLoginType": "logLoginType",
+                "memberPass": "mem_pass",
+                "safeFlag": "safeflg",
+                "timeSpan": "ppui_logintime"
+            },
         }),
         "sign2": Munch({
             "login": {
@@ -35,8 +42,15 @@ class BaiduLogin(LoginTask):
             "loginCheck": {
                 "isPhone": lambda e: "true" if e else "false"
             }
-        })
-    })
+        }),
+        "store": Munch({
+            "nameL": "57a4c3ff",
+            "nameR": "appsapi0",
+            "ds": "",
+            "tk": "",
+            "ak": "1e3f2dd1c81f2075171a547893391274",
+        }),
+        "locus": {
 
-    def __init__(self, opt: Optional[Munch]):
-        super(BaiduLogin, self).__init__(opt=opt)
+        }
+    })

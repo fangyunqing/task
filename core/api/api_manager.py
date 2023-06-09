@@ -7,26 +7,29 @@ __author__ = 'fyq'
 
 from typing import Type, List, Dict
 
+from munch import Munch
+
 from core.api import Api
 from core.api.api import api_cls_list
 
 
 class ApiManager:
 
-    def __init__(self):
+    def __init__(self, opt: Munch):
         self._apis: List[Type[Api]] = api_cls_list
         self._api_names = {api.api_name for api in self._apis}
+        self._opt = opt
 
         def _query_seq_pairs(cls, quoter, pairs):
             for key, val in pairs:
                 if isinstance(val, (list, tuple)):
                     for v in val:
-                        if key in self._api_names:
+                        if key in self._api_names or val is None:
                             yield quoter(key)
                         else:
                             yield quoter(key) + "=" + quoter(cls._query_var(v))
                 else:
-                    if key in self._api_names:
+                    if key in self._api_names or val is None:
                         yield quoter(key)
                     else:
                         yield quoter(key) + "=" + quoter(cls._query_var(val))

@@ -16,23 +16,26 @@ from loguru import logger
 from munch import Munch
 from yarl import URL
 
+from core.account import Account
 from core.task.abstract_task import LoginTask, logins_cls_list
 from core.task.task import Task
 
 
 class LoginManager:
 
-    def __init__(self):
+    def __init__(self, opt: Munch):
         self._logins: Dict[str, Type[LoginTask]] = {_.task_name: _ for _ in logins_cls_list}
         self._logger = logger
+        self._opt = opt
 
     async def login_before_exec(self, login_name: str, task: Task):
-        login_cls = self._logins.get(login_name)
-        assert login_cls is not None
-        login_task = login_cls(opt=task.opt)
-        session = ClientSession(headers=login_task.headers)
-        await login_task.exec(session=session)
-        await task.exec(session=session)
+        # login_cls = self._logins.get(login_name)
+        # assert login_cls is not None
+        # login_task = login_cls(opt=task.opt, account=None)
+        # session = ClientSession(headers=login_task.headers)
+        # await login_task.exec(session=session)
+        # await task.exec(session=session)
+        pass
 
     def __getitem__(self, item) -> Type[LoginTask]:
         return self._logins.get(item)
@@ -40,10 +43,10 @@ class LoginManager:
     def __iter__(self) -> Iterable[Type[LoginTask]]:
         return iter(self._logins.values())
 
-    async def run_login(self, login_name: str, opt: Munch):
+    async def run_login(self, login_name: str, account: Account):
         login_cls = self._logins.get(login_name)
         assert login_cls is not None
-        login_task = login_cls(opt=opt)
+        login_task = login_cls(opt=self._opt, account=account)
         tc = aiohttp.TraceConfig()
         tc.on_request_start.append(self._on_request_start)
         tc.on_request_end.append(self._on_request_end)
@@ -73,7 +76,11 @@ class LoginManager:
         except (ContentTypeError, JSONDecodeError):
             json = "..."
 
-        text = await params.response.text()
+        try:
+            text = await params.response.text()
+        except UnicodeDecodeError:
+            text = "..."
+
         if len(text) > 1024:
             text = "..."
 

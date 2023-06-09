@@ -2,7 +2,7 @@ from Crypto.Cipher import AES
 import base64
 import binascii
 
-__all__ = ["encryption"]
+__all__ = ["encryption", "base64_encryption"]
 
 
 class MData:
@@ -203,3 +203,9 @@ def encryption(data: str, key: str):
     m_data = aes.encrypt_from_string(data)
     res = m_data.to_base64()
     return base64.b64encode(res.encode()).decode()
+
+
+def base64_encryption(data: str, key: str):
+    aes = AESCryptor(key.encode(), AES.MODE_ECB, None, padding_mode="PKCS7Padding", character_set='utf-8')
+    m_data = aes.encrypt_from_string(data)
+    return m_data.to_base64()
