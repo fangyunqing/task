@@ -9,7 +9,7 @@ import time
 from typing import Dict, Any
 from urllib.parse import unquote
 
-from core.util.time import eleven_digits_time
+from core.util.time import thirteen_digits_time
 
 _static = {
     "charset": "GBK",
@@ -99,7 +99,7 @@ def add_params(init_data: Dict[str, Any],
     params["tpl"] = _static["product"]
     params["subpro"] = _static["subpro"]
     params["apiver"] = "v3"
-    params["tt"] = eleven_digits_time()
+    params["tt"] = thirteen_digits_time()
     if init_data:
         d1 = d1 if d1 else {}
         d2 = d2 if d2 else {}

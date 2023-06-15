@@ -9,10 +9,10 @@ from torchvision.transforms import Normalize
 from torchvision.transforms import functional
 from torchvision.transforms.functional import F_t
 
-
 __all__ = [
     "DEFAULT_NORM",
-    "from_img"
+    "from_img",
+    "process_captcha"
 ]
 
 DEFAULT_NORM = Normalize(
@@ -232,3 +232,24 @@ def from_captcha(src: Tensor, angle_factor: float, target_size) -> Tensor:
     return dst
 
 
+def process_captcha(img: Image, target_size: int = 224, norm: Normalize = DEFAULT_NORM) -> Tensor:
+    """
+    convert a captcha image into tensor
+
+    Args:
+        img (Image): captcha image (square with border)
+        target_size (int, optional): target size. Defaults to DEFAULT_TARGET_SIZE.
+        norm (Normalize, optional): normalize policy. Defaults to DEFAULT_NORM.
+
+    Returns:
+        Tensor: tensor ([C,H,W]=[3,target_size,target_size], dtype=float32, range=[0.0,1.0))
+    """
+
+    img = img.convert('RGB')
+    img_ts = to_tensor(img)
+    img_ts = strip_border(img_ts)
+    img_ts = u8_to_float32(img_ts)
+    img_ts = square_resize(img_ts, target_size)
+    img_ts = norm(img_ts)
+
+    return img_ts

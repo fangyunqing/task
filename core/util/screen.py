@@ -12,3 +12,11 @@ def screen():
 
 def avail_screen():
     return 1920, 1040
+
+
+def outer_screen():
+    return 1920, 1040
+
+
+def scroll_screen():
+    return 1203, 1203

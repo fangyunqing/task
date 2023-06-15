@@ -6,24 +6,24 @@
 __author__ = 'fyq'
 
 from abc import abstractmethod
-from typing import Tuple, Optional, Dict
+from typing import Optional
 
 from aiohttp import ClientSession, ClientResponse
 
-from core.api import Api
+from core.api import Api, InvokeInfo
 from core.constant import hm
-from core.exception import ApiException, NotFoundApiException
+from core.exception import ApiException
 
 
 class AbstractApi(Api):
 
-    def pre(self) -> Optional[str]:
+    def pre(self) -> Optional[InvokeInfo]:
         return None
 
-    def request_if_fail(self) -> Optional[str]:
+    def request_if_fail(self) -> Optional[InvokeInfo]:
         return None
 
-    def next(self) -> Optional[str]:
+    def next(self) -> Optional[InvokeInfo]:
         return None
 
     @property
@@ -52,19 +52,19 @@ class AbstractApi(Api):
         self._before()
 
         if self.method == hm.get:
-            response = await session.get(self.url, params=self.data, proxy="http://127.0.0.1:8888")
+            response = await session.get(self.url, params=self.data, proxy=self.task.opt.proxy)
         elif self.method == hm.post_data:
-            response = await session.post(self.url, data=self.data, proxy="http://127.0.0.1:8888")
+            response = await session.post(self.url, data=self.data, proxy=self.task.opt.proxy)
         elif self.method == hm.post_json:
-            response = await session.post(self.url, json=self.data)
+            response = await session.post(self.url, json=self.data, proxy=self.task.opt.proxy)
         elif self.method == hm.delete:
-            response = await session.delete(self.url)
+            response = await session.delete(self.url, proxy=self.task.opt.proxy)
         elif self.method == hm.head:
-            response = await session.head(self.url)
+            response = await session.head(self.url, proxy=self.task.opt.proxy)
         elif self.method == hm.options:
-            response = await session.options(self.url)
+            response = await session.options(self.url, proxy=self.task.opt.proxy)
         elif self.method == hm.put:
-            response = await session.put(self.url, data=self.data)
+            response = await session.put(self.url, data=self.data, proxy=self.task.opt.proxy)
         else:
             if self.method:
                 raise ApiException(f"{self.api_sign}的方法{self.method}不支持")

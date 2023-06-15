@@ -17,7 +17,7 @@ from munch import Munch
 from core import constant
 from core.account import Account
 from core.task.task import Task
-from core.api import Api
+from core.api import Api, InvokeInfo
 from core.exception import TaskException
 from core.util.user_agent import random_ua
 
@@ -72,29 +72,32 @@ class AbstractTask(Task):
 
         self.config.user_agent = session.headers.get("User-Agent")
 
-        next_api_name = self.first_api_name
-        assert next_api_name is not None
+        api_name = self.first_api_name
+        assert api_name is not None
+        next_invoker_info = InvokeInfo(api_name=api_name)
         while True:
-            if next_api_name:
-                next_api_cls: Type[Api] = self.apis.get(next_api_name)
+            if next_invoker_info:
+                next_api_cls: Type[Api] = self.apis.get(next_invoker_info.api_name)
                 if next_api_cls is None:
-                    raise TaskException(f"{self.task_sign}接口{next_api_name}未找到")
+                    raise TaskException(f"{self.task_sign}接口{next_invoker_info.api_name}未找到")
             else:
                 raise TaskException(f"{self.task_sign}未找到下一个接口")
-            current_api = next_api_cls(task=self, config=self.config)
-            if pre_api_name := current_api.pre():
-                pre_api_cls: Type[Api] = self.apis.get(pre_api_name)
+            current_api = next_api_cls(task=self, config=self.config, invoke_config=next_invoker_info.config)
+            if pre_invoker_info := current_api.pre():
+                pre_api_cls: Type[Api] = self.apis.get(pre_invoker_info.api_name)
                 if pre_api_cls:
-                    await pre_api_cls(task=self, config=self.config).request(session=session)
+                    await pre_api_cls(task=self,
+                                      config=self.config,
+                                      invoke_config=pre_invoker_info.config).request(session=session)
             res = await (current_api.request(session=session))
             if not res:
-                next_api_name = current_api.request_if_fail()
-                if next_api_name is None:
+                next_invoker_info = current_api.request_if_fail()
+                if next_invoker_info is None:
                     break
             else:
                 if current_api.stop or current_api.next() is None:
                     break
-                next_api_name = current_api.next()
+                next_invoker_info = current_api.next()
             await asyncio.sleep(1)
 
     @property
@@ -169,7 +172,7 @@ class LoginTask(AbstractTask):
             headers["Host"] = self.host
         if self.referer:
             headers["Referer"] = self.referer
-        headers["Accept-Encoding"] = "identity"
+
         return headers
 
 

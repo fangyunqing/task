@@ -9,7 +9,7 @@ import time
 
 from core.api.baidu.util import util2, util4, util5
 from core.util.ase import encryption
-from core.util.time import eleven_digits_time
+from core.util.time import thirteen_digits_time
 
 _version = {
     "version": "v3"
@@ -69,7 +69,7 @@ def encrypt(d1, d2, d3):
     var1.pop("callback", "")
     var1.pop("elapsed", "")
     var1.pop("shaOne", "")
-    var2 = eleven_digits_time()
+    var2 = thirteen_digits_time()
     var3 = var2
     while True:
         var3 = util2.algorithm6(
@@ -86,7 +86,7 @@ def encrypt(d1, d2, d3):
         "time": var1["time"],
         "alg": var1["alg"],
         "sig": encryption(util5.add_screen(var1, None), d3),
-        "elapsed": eleven_digits_time() - var2,
+        "elapsed": thirteen_digits_time() - var2,
         "shaOne": var3
     }
 

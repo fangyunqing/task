@@ -6,15 +6,13 @@
 __author__ = 'fyq'
 
 from json.decoder import JSONDecodeError
-from types import SimpleNamespace
 from typing import Type, Dict, Iterable
 
 import aiohttp
 import simplejson
-from aiohttp import ClientSession, TraceRequestStartParams, ClientResponse, TraceRequestEndParams, ContentTypeError
+from aiohttp import ClientSession, TraceRequestStartParams, TraceRequestEndParams, ContentTypeError
 from loguru import logger
 from munch import Munch
-from yarl import URL
 
 from core.account import Account
 from core.task.abstract_task import LoginTask, logins_cls_list
@@ -59,41 +57,44 @@ class LoginManager:
                                 session: ClientSession,
                                 tc: aiohttp.TraceConfig,
                                 params: TraceRequestStartParams):
-        data = {
-            "url": str(params.url),
-            "method": params.method,
-            "headers": {k: v for k, v in params.headers.items()},
-            "cookies": {cj.key: cj for cj in session.cookie_jar}
-        }
-        self._logger.debug("\n" + simplejson.dumps(data, indent="   "))
+        if self._opt.debug:
+            data = {
+                "url": str(params.url),
+                "method": params.method,
+                "headers": {k: v for k, v in params.headers.items()},
+                "cookies": {cj.key: cj for cj in session.cookie_jar}
+            }
+
+            self._logger.debug("\n" + simplejson.dumps(data, indent="   "))
 
     async def _on_request_end(self,
                               session: ClientSession,
                               tc: aiohttp.TraceConfig,
                               params: TraceRequestEndParams):
-        try:
-            json = await params.response.json()
-        except (ContentTypeError, JSONDecodeError):
-            json = "..."
+        if self._opt.debug:
+            try:
+                json = await params.response.json()
+            except (ContentTypeError, JSONDecodeError):
+                json = "..."
 
-        try:
-            text = await params.response.text()
-        except UnicodeDecodeError:
-            text = "..."
+            try:
+                text = await params.response.text()
+            except UnicodeDecodeError:
+                text = "..."
 
-        if len(text) > 1024:
-            text = "..."
+            if len(text) > self._opt.response_len:
+                text = "..."
 
-        response = {
-            "status": params.response.status,
-            "json": json,
-            "text": text,
-            "cookies": params.response.cookies
-        }
-        data = {
-            "url": str(params.url),
-            "method": params.method,
-            "headers": {k: v for k, v in params.headers.items()},
-            "response": response
-        }
-        self._logger.debug("\n" + simplejson.dumps(data, indent="   "))
+            response = {
+                "status": params.response.status,
+                "json": json,
+                "text": text,
+                "cookies": params.response.cookies
+            }
+            data = {
+                "url": str(params.url),
+                "method": params.method,
+                "headers": {k: v for k, v in params.headers.items()},
+                "response": response
+            }
+            self._logger.debug("\n" + simplejson.dumps(data, indent="   "))

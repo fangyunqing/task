@@ -5,14 +5,15 @@
 
 __author__ = 'fyq'
 
+import json
 import time
 from typing import Any, Dict
 
-from core.api.baidu.util import util3
-from core.util.time import eleven_digits_time
+from core.api.baidu.util import util3, util6, util4
+from core.util.time import thirteen_digits_time
 
 
-def jsonp(params: Dict[str, Any], process: Dict[str, Any]) -> Dict[str, Any]:
+def jsonp(params: Dict[str, Any], process: Dict[str, Any], fuid: str = None) -> Dict[str, Any]:
     """
     n.jsonp = function(n, i, s) { s = s || {}, e && e.traceID && e.traceID.createTraceID && (i.traceid =
     e.traceID.createTraceID()); var o = {}; for (var a in i) { var c = i[a]; void 0 !== c && null !== c && (o[a] = c)
@@ -24,7 +25,8 @@ def jsonp(params: Dict[str, Any], process: Dict[str, Any]) -> Dict[str, Any]:
     s.processData && (t = s.processData(t)), e && e(t) }, { charset: s.charset, queryField: s.queryField,
     timeOut: s.timeOut, onfailure: function() { t && t() } }) } ) }
     """
-    params["traceid"] = ""
+    if fuid:
+        params["traceid"] = "070D7101"
     var1 = {}
     for k, var4 in params.items():
         if k:
@@ -38,7 +40,7 @@ def jsonp(params: Dict[str, Any], process: Dict[str, Any]) -> Dict[str, Any]:
         "O0O000": "O0OOO0"
     }
 
-    var3 = eleven_digits_time() / 1000
+    var3 = thirteen_digits_time() / 1000
     var4 = int(var3 / 86400) % 5
     var5 = list(var2.keys())
     _ = ""
@@ -47,7 +49,7 @@ def jsonp(params: Dict[str, Any], process: Dict[str, Any]) -> Dict[str, Any]:
     if _ in util3.moonshadV3:
         params = {**params, **util3.moonshadV3[_](var1, {})}
 
+    if fuid:
+        params["rinfo"] = json.dumps({"fuid": util4.algorithm14(fuid, None, None)})
+
     return params
-
-
-

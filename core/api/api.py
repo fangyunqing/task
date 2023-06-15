@@ -8,7 +8,8 @@ from __future__ import annotations
 __author__ = 'fyq'
 
 from abc import abstractmethod, ABC
-from typing import Union, List, TYPE_CHECKING, Optional, Tuple, Dict, Type
+from dataclasses import dataclass, field
+from typing import List, TYPE_CHECKING, Optional, Type
 
 from aiohttp import ClientSession
 from munch import Munch
@@ -19,6 +20,12 @@ if TYPE_CHECKING:
     from core.task import Task
 
 api_cls_list: List[Type[Api]] = []
+
+
+@dataclass
+class InvokeInfo:
+    api_name: str
+    config: Munch = field(default_factory=lambda: Munch())
 
 
 class Api(ABC):
@@ -61,9 +68,10 @@ class Api(ABC):
     # 调用此接口的任务
     task: "Task" = None
 
-    def __init__(self, task: "Task", config: Munch):
+    def __init__(self, task: "Task", config: Munch, invoke_config: Munch):
         self.task = task
         self.config = config
+        self.invoke_config = invoke_config
 
     def __repr__(self):
         return f"{self.api_sign}:{self.method} {self.url}"
@@ -74,7 +82,7 @@ class Api(ABC):
             api_cls_list.append(cls)
 
     @abstractmethod
-    def pre(self) -> Optional[str]:
+    def pre(self) -> Optional[InvokeInfo]:
         pass
 
     @abstractmethod
@@ -86,17 +94,14 @@ class Api(ABC):
         return f"{self.task_types}-{self.api_types}-{self.api_name}"
 
     @abstractmethod
-    def request_if_fail(self) -> Optional[str]:
+    def request_if_fail(self) -> Optional[InvokeInfo]:
         pass
 
     @abstractmethod
-    def next(self) -> Optional[str]:
+    def next(self) -> Optional[InvokeInfo]:
         pass
 
     @property
     @abstractmethod
     def stop(self) -> bool:
         pass
-
-
-

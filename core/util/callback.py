@@ -7,9 +7,8 @@ __author__ = 'fyq'
 
 import random
 import string
-import time
 
-from core.util.time import eleven_digits_time
+from core.util.time import thirteen_digits_time
 
 
 def random_callback(rule="??__???__??????"):
@@ -32,6 +31,6 @@ def jquery_random_call_back():
     res = "jQuery"
     for n in range(0, 21):
         res += str(int(random.random() * 10))
-    res += f"_{eleven_digits_time()}"
+    res += f"_{thirteen_digits_time()}"
 
     return res

@@ -5,25 +5,29 @@
 
 __author__ = 'fyq'
 
+import asyncio
 import json
 import os
+import random
 import re
 import uuid
 from typing import Optional
-
 from urllib import parse
 
 from aiohttp import ClientResponse
+from munch import Munch
 
 from core import constant
+from core.api import InvokeInfo
 from core.api.abstract_api import AbstractApi
-from core.api.baidu.util import util1, util6
+from core.api.baidu.util import util1, util6, locus
 from core.api.baidu.util.jsonp import jsonp
-from core.util import guid, rsa
+from core.util import guid, rsa, screen
 from core.util.ase import base64_encryption
 from core.util.callback import random_callback, jquery_random_call_back
+from core.util.deep_learn import rot_net_captcha
 from core.util.format_response import format1
-from core.util.time import eleven_digits_time
+from core.util.time import thirteen_digits_time
 from settings import IMAGE_PATH
 
 
@@ -42,11 +46,11 @@ class IndexApi(AbstractApi):
 
 class GetApiApi(AbstractApi):
 
-    def next(self) -> Optional[str]:
-        return "getpublickey"
+    def next(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("getpublickey")
 
-    def pre(self) -> Optional[str]:
-        return "index"
+    def pre(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("index")
 
     url = "https://passport.baidu.com/v2/api/?getapi"
     method = constant.hm.get
@@ -84,8 +88,8 @@ class GetApiApi(AbstractApi):
 
 class GetPublicKeyApi(AbstractApi):
 
-    def next(self) -> Optional[str]:
-        return "login"
+    def next(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("login")
 
     url = "https://passport.baidu.com/v2/getpublickey"
     method = constant.hm.get
@@ -127,26 +131,29 @@ class ViewLogApi(AbstractApi):
     method = constant.hm.get
     api_types = ['baidu']
     task_types = [constant.kw.login]
+    op = None
 
     def _before(self):
+        self.data = {constant.kw.callback: jquery_random_call_back(),
+                     "ak": self.config.store.get("ak", None),
+                     "as": self.config.store.get("nameL", None)}
+
         if self.config.locus:
-            self.data["fk"] = (
+            self.task.debug("\n" + "模拟轨迹:" + json.dumps(self.config.locus, indent="   "))
+            self.data["fs"] = (
                 base64_encryption(data=json.dumps(self.config.locus),
                                   key=self.config.store.get("nameL", "") + self.config.store.get("nameR", "")))
+            if "cv" in self.invoke_config:
+                if self.invoke_config.cv:
+                    self.data["cv"] = "submit"
+            else:
+                self.data["cv"] = "submit"
         else:
-            self.data["fk"] = None
-        self.data["ak"] = self.config.store.get("ak", None)
-        self.data["as"] = self.config.store.get("nameL", None)
+            self.data["fs"] = None
+
         self.data["tk"] = self.config.store.get("tk", None)
         self.data["scene"] = self.config.store.get("scene", None)
-        self.data["cv"] = None
-        self.data["_"] = eleven_digits_time()
-        self.data[constant.kw.callback] = jquery_random_call_back()
-
-        # clear
-        self.config.locus = {}
-        self.config.store["ds"] = ""
-        self.config.store["tk"] = ""
+        self.data["_"] = thirteen_digits_time()
 
     async def _after(self, response: ClientResponse) -> bool:
         text = await response.text()
@@ -156,8 +163,17 @@ class ViewLogApi(AbstractApi):
         self.config.store["as"] = m.data.get("as", "")
         self.config.store["tk"] = m.data.get("tk", "")
         self.config.store["nameL"] = m.data.get("as", "6bffae1c")
-        self.config.initTime = self.data["_"]
+        if "op" in m.data:
+            self.op = m.data["op"]
+        else:
+            self.op = None
         return True
+
+    def next(self) -> Optional[InvokeInfo]:
+        if self.op in [0, 2]:
+            return InvokeInfo("getstyle")
+        elif self.op == 1:
+            return InvokeInfo("login")
 
 
 class LoginApi(AbstractApi):
@@ -167,34 +183,32 @@ class LoginApi(AbstractApi):
     task_types = [constant.kw.login]
     err_no = None
 
-    def pre(self) -> Optional[str]:
-        return "viewlog"
+    def pre(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("viewlog", Munch({"cv": False}))
 
     def _before(self):
         init_data = {
+            "token": self.config.token,
+            "subpro": "",
             "codeString": "",
+            "safeFlag": "0",
+            "u": "https://zhidao.baidu.com/",
+            "isPhone": "",
             "detect": "1",
             "gid": guid.guid(),
-            "idc": "",
-            "isPhone": "",
-            "logLoginType": "pc_loginDialog",
-            "loginMerge": "true",
-            "logintype": "dialogLogin",
-            "memberPass": "on",
-            "mkey": "",
-            "password": rsa.encryption(self.config.pubkey, self.config.account.password),
             "quick_user": "0",
-            "safeFlag": "0",
+            "logintype": "dialogLogin",
+            "logLoginType": "pc_loginDialog",
+            "idc": "",
+            "loginMerge": "true",
+            "mkey": "",
             "splogin": "rate",
-            "staticPage": "https://zhidao.baidu.com/static/common/https-html/v3Jump.html",
-            "subpro": "",
-            "u": "https://zhidao.baidu.com/",
             "userName": self.config.account.username,
-            "verifyCode": "",
-            "token": self.config.token,
+            "password": rsa.encryption(self.config.pubkey, self.config.account.password),
+            "memberPass": "on",
             "rsaKey": self.config.key,
             "crypttype": 12,
-            "timeSpan": eleven_digits_time() - self.config.initTime,
+            "timeSpan": random.randint(200, 4000),
             "countrycode": "",
             "FP_UID": "",
             "FP_INFO": "",
@@ -213,14 +227,14 @@ class LoginApi(AbstractApi):
                                   sign=sign,
                                   d1=self.config.sign1.get(sign),
                                   d2=self.config.sign2.get(sign),
-                                  static=False)
+                                  static=True)
         process = {
             "charset": "utf-8",
             "processData": ""
         }
 
-        self.data = jsonp(params=params, process=process)
-        self.data[constant.kw.callback] = "parent." + random_callback()
+        self.data = jsonp(params=params, process=process, fuid=init_data["fuid"])
+        self.data[constant.kw.callback] = "parent." + random_callback("bd__pcbs__??????")
 
     async def _after(self, response: ClientResponse) -> bool:
         text = await response.text()
@@ -237,9 +251,9 @@ class LoginApi(AbstractApi):
         self.err_no = res["err_no"]
         return self.err_no == "0"
 
-    def request_if_fail(self) -> Optional[str]:
+    def request_if_fail(self) -> Optional[InvokeInfo]:
         if self.err_no == "6":
-            return "getstyle"
+            return InvokeInfo("getstyle")
 
 
 class GetStyleApi(AbstractApi):
@@ -255,7 +269,7 @@ class GetStyleApi(AbstractApi):
             "scene": None,
             "isios": 0,
             "type": "default",
-            "_": eleven_digits_time(),
+            "_": thirteen_digits_time(),
             "callback": jquery_random_call_back()
         }
 
@@ -265,12 +279,12 @@ class GetStyleApi(AbstractApi):
         assert m is not None
         self.config.verify_image = {
             "url": parse.unquote(m.data["ext"]["img"]),
-            "path": None
+            "backstr": m.data["backstr"]
         }
         return True
 
-    def next(self) -> Optional[str]:
-        return "verifyimage"
+    def next(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("verifyimage")
 
 
 class VerifyImageApi(AbstractApi):
@@ -286,5 +300,73 @@ class VerifyImageApi(AbstractApi):
         image_path = f"{IMAGE_PATH}{os.sep}{str(uuid.uuid4())}.jpg"
         with open(image_path, 'wb') as fp:
             fp.write(await response.read())
-        self.config.verify_image["path"] = image_path
+        # pytorch计算出图片旋转的角度
+        model_path = f"{self.task.opt.model_path}{os.sep}rot_net.pth"
+        angle = rot_net_captcha(image_path=image_path,
+                                model_path=model_path,
+                                debug=self.task.opt.debug)
+        self.task.info(f"图片旋转角度[{angle}]")
+        angel_length = round(angle * 212 / 360, 0)
+        # 模拟滑动轨迹
+        imitate_points = locus.imitate_locus(25, 212, angel_length)
+        start_t = thirteen_digits_time()
+        point_list = []
+        for point in imitate_points.error_points:
+            start_t += random.randint(190, 210)
+            point_list.append({
+                "fx": point.x,
+                "fy": point.y,
+                "t": start_t,
+                "bf": 2
+            })
+        min_t = point_list[-1]["t"] + 50
+        max_t = point_list[-1]["t"] + 150
+        for point in imitate_points.right_points:
+            start_t += random.randint(190, 210)
+            point_list.append({
+                "fx": point.x,
+                "fy": point.y,
+                "t": start_t,
+                "bf": 1
+            })
+
+        self.config.locus = {
+            "cl": [
+                {
+                    "x": imitate_points.click_point.x,
+                    "y": imitate_points.click_point.y,
+                    "t": random.randint(min_t, max_t)
+                }
+            ],
+            "mv": point_list,
+            "sc": [],
+            "kb": [],
+            "sb": [],
+            "sd": [],
+            "sm": [],
+            "cr": {
+                "screenTop": 0,
+                "screenLeft": 0,
+                "clientWidth": imitate_points.client_width,
+                "clientHeight": imitate_points.client_height,
+                "screenWidth": screen.screen()[0],
+                "screenHeight": screen.screen()[1],
+                "availWidth": screen.avail_screen()[0],
+                "availHeight": screen.avail_screen()[1],
+                "outerWidth": screen.outer_screen()[0],
+                "outerHeight": screen.outer_screen()[1],
+                "scrollWidth": screen.scroll_screen()[0],
+                "scrollHeight": screen.scroll_screen()[1]
+            },
+            "simu": 0,
+            "ac_c": round(angel_length / 212, 2),
+            "backstr": self.config.verify_image["backstr"]
+
+        }
+        delay = point_list[-1]["t"] - thirteen_digits_time()
+        if delay > 0:
+            await asyncio.sleep(delay / 1000)
         return True
+
+    def next(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("viewlog")

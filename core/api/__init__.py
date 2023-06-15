@@ -5,5 +5,5 @@
 
 __author__ = 'fyq'
 
-from .api import Api
+from .api import Api, InvokeInfo
 from .api_manager import ApiManager

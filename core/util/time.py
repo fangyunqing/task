@@ -8,7 +8,7 @@ __author__ = 'fyq'
 import time
 
 
-def eleven_digits_time():
+def thirteen_digits_time():
     """
     1686203781424
     :return:

@@ -6,7 +6,10 @@
 __author__ = 'fyq'
 
 default_opt = {
-    "debug": False,
-    "proxy": False,
-    "account": r"F:\pythonProject\task\core\account.yml"
+    "debug": True,
+    "proxy": "http://127.0.0.1:8888",
+    "account": r"F:\pythonProject\task\core\account.yml",
+    "response_len": 10240,
+    "image_path": r"F:\pythonProject\task\image",
+    "model_path": r"F:\pythonProject\task\model"
 }

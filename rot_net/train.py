@@ -40,7 +40,7 @@ if __name__ == "__main__":
                               cls_num=cls_num)
 
     # 数据加载器
-    num_workers = os.cpu_count()
+    num_workers = 1
     batch_size = 64
     train_dataloader = DataLoader(
         train_dataset,

@@ -16,7 +16,7 @@ from munch import Munch
 from core.util import ase
 from core.util.js_displace import left_shift
 from core.util.screen import screen, avail_screen
-from core.util.time import eleven_digits_time
+from core.util.time import thirteen_digits_time
 
 
 def page_token():
@@ -24,7 +24,7 @@ def page_token():
     res = res[0:18]
     while len(res) < 18:
         res += str(int(random.random() * 10))
-    return f"tk{res}{eleven_digits_time()}"
+    return f"tk{res}{thirteen_digits_time()}"
 
 
 def load_info() -> Munch:
@@ -33,7 +33,7 @@ def load_info() -> Munch:
         "keyDown": "",
         "mouseMove": "",
         "version": 26,
-        "loadTime": eleven_digits_time() / 1000,
+        "loadTime": thirteen_digits_time() / 1000,
         "browserInfo": "1,2,101",
         "token": page_token(),
         "location": "https://zhidao.baidu.com/,undefined",
