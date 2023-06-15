@@ -24,11 +24,23 @@ from core.api.baidu.util import util1, util6, locus
 from core.api.baidu.util.jsonp import jsonp
 from core.util import guid, rsa, screen
 from core.util.ase import base64_encryption
-from core.util.callback import random_callback, jquery_random_call_back
+from core.util.random import random_callback, jquery_random_call_back
 from core.util.deep_learn import rot_net_captcha
 from core.util.format_response import format1
 from core.util.time import thirteen_digits_time
 from settings import IMAGE_PATH
+
+_error = {
+    1: "您输入的帐号格式不正确",
+    2: "用户名或密码有误",
+    3: "验证码不存在或已过期",
+    4: "帐号或密码错误",
+    6: "您输入的验证码有误",
+    7: "用户名或密码有误",
+    16: "您的帐号因安全问题已被限制登录",
+    257: "請輸入驗證碼",
+    120021: "登录失败,请在弹出的窗口操作,或重新登录",
+}
 
 
 class IndexApi(AbstractApi):
@@ -49,9 +61,6 @@ class GetApiApi(AbstractApi):
     def next(self) -> Optional[InvokeInfo]:
         return InvokeInfo("getpublickey")
 
-    def pre(self) -> Optional[InvokeInfo]:
-        return InvokeInfo("index")
-
     url = "https://passport.baidu.com/v2/api/?getapi"
     method = constant.hm.get
     api_types = ['baidu']
@@ -60,7 +69,7 @@ class GetApiApi(AbstractApi):
     def _before(self):
         init_data = {
             "apiType": "login",
-            "gid": guid.guid(),
+            "gid": self.config.gid,
             "loginType": "dialogLogin",
             "loginVersion": "v4",
         }
@@ -70,12 +79,8 @@ class GetApiApi(AbstractApi):
                                   d1=self.config.sign1.get(sign),
                                   d2=self.config.sign2.get(sign),
                                   static=False)
-        process = {
-            "charset": "utf-8",
-            "processData": ""
-        }
 
-        self.data = jsonp(params=params, process=process)
+        self.data = jsonp(params=params)
         self.data[constant.kw.callback] = random_callback()
 
     async def _after(self, response: ClientResponse) -> bool:
@@ -89,7 +94,7 @@ class GetApiApi(AbstractApi):
 class GetPublicKeyApi(AbstractApi):
 
     def next(self) -> Optional[InvokeInfo]:
-        return InvokeInfo("login")
+        return InvokeInfo("logincheck")
 
     url = "https://passport.baidu.com/v2/getpublickey"
     method = constant.hm.get
@@ -98,7 +103,7 @@ class GetPublicKeyApi(AbstractApi):
 
     def _before(self):
         init_data = {
-            "gid": guid.guid(),
+            "gid": self.config.gid,
             "loginVersion": "v5",
         }
         sign = "getRsaKey"
@@ -109,12 +114,7 @@ class GetPublicKeyApi(AbstractApi):
                                   d2=self.config.sign2.get(sign),
                                   static=False)
 
-        process = {
-            "charset": "utf-8",
-            "processData": ""
-        }
-
-        self.data = jsonp(params=params, process=process)
+        self.data = jsonp(params=params)
         self.data[constant.kw.callback] = random_callback()
 
     async def _after(self, response: ClientResponse) -> bool:
@@ -195,7 +195,7 @@ class LoginApi(AbstractApi):
             "u": "https://zhidao.baidu.com/",
             "isPhone": "",
             "detect": "1",
-            "gid": guid.guid(),
+            "gid": self.config.gid,
             "quick_user": "0",
             "logintype": "dialogLogin",
             "logLoginType": "pc_loginDialog",
@@ -228,12 +228,10 @@ class LoginApi(AbstractApi):
                                   d1=self.config.sign1.get(sign),
                                   d2=self.config.sign2.get(sign),
                                   static=True)
-        process = {
-            "charset": "utf-8",
-            "processData": ""
-        }
 
-        self.data = jsonp(params=params, process=process, fuid=init_data["fuid"])
+        self.data = jsonp(params=params,
+                          fuid=init_data["fuid"],
+                          trace_id=True)
         self.data[constant.kw.callback] = "parent." + random_callback("bd__pcbs__??????")
 
     async def _after(self, response: ClientResponse) -> bool:
@@ -370,3 +368,62 @@ class VerifyImageApi(AbstractApi):
 
     def next(self) -> Optional[InvokeInfo]:
         return InvokeInfo("viewlog")
+
+
+class LoginInfoApi(AbstractApi):
+    url = "https://zhidao.baidu.com/api/loginInfo"
+    method = constant.hm.get
+    api_types = ['baidu']
+    task_types = [constant.kw.login]
+    is_login: int
+
+    def _before(self):
+        self.data = {
+            "t": thirteen_digits_time()
+        }
+
+    async def _after(self, response: ClientResponse) -> bool:
+        self.is_login = 0
+        return True
+
+    def next(self) -> Optional[InvokeInfo]:
+        if self.is_login == 0:
+            return InvokeInfo("getapi")
+
+    def pre(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("index")
+
+
+class LoginCheckApi(AbstractApi):
+    url = "https://passport.baidu.com/v2/api/?logincheck"
+    method = constant.hm.get
+    api_types = ['baidu']
+    task_types = [constant.kw.login]
+
+    def _before(self):
+        init_data = {
+            "token": self.config.token,
+            "sub_source": "leadsetpwd",
+            "username": self.config.account.username,
+            "loginversion": "v4",
+            "dv": util6.dv_js_input(),
+        }
+
+        sign = "loginCheck"
+
+        params = util1.add_params(init_data=init_data,
+                                  sign=sign,
+                                  d1=self.config.sign1.get(sign),
+                                  d2=self.config.sign2.get(sign),
+                                  static=True)
+
+        self.data = jsonp(params=params,
+                          fuid=util6.fuid(self.config),
+                          trace_id=True)
+        self.data[constant.kw.callback] = random_callback("bd__cbs__??????")
+
+    async def _after(self, response: ClientResponse) -> bool:
+        return True
+
+    def next(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("login")

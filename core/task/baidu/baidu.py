@@ -10,19 +10,19 @@ from typing import Optional
 from munch import Munch
 
 from core.task.abstract_task import LoginTask
+from core.util import guid
 
 
 class BaiduLogin(LoginTask):
 
-    first_api_name = "getapi"
+    first_api_name = "logininfo"
 
     api_types = ["baidu"]
-
-    host = "passport.baidu.com"
 
     referer = "https://zhidao.baidu.com/"
 
     config = Munch({
+        "gid": guid.guid(),
         "sign1": Munch({
             "getApiInfo": {
                 "apiType": "class",

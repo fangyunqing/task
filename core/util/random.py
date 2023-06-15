@@ -1,6 +1,6 @@
 # @Time    : 2023/06/03 15:20
 # @Author  : fyq
-# @File    : callback.py
+# @File    : random.py
 # @Software: PyCharm
 
 __author__ = 'fyq'
@@ -15,10 +15,7 @@ def random_callback(rule="??__???__??????"):
     res = ""
     for index, r in enumerate(rule):
         if r == "?":
-            if index in [0, 1] or random.randint(0, 1) == 0:
-                res += random.choice(string.ascii_lowercase)
-            else:
-                res += str(int(random.random() * 10))
+            res += random.choice(string.ascii_lowercase + string.digits)
         else:
             res += r
     return res
@@ -34,3 +31,10 @@ def jquery_random_call_back():
     res += f"_{thirteen_digits_time()}"
 
     return res
+
+
+def random_trace_id():
+    res = ""
+    for _ in range(6):
+        res += random.choice(string.ascii_uppercase + string.digits)
+    return res + "01"

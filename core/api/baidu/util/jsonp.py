@@ -6,14 +6,16 @@
 __author__ = 'fyq'
 
 import json
-import time
 from typing import Any, Dict
 
-from core.api.baidu.util import util3, util6, util4
+from core.api.baidu.util import util3, util4
 from core.util.time import thirteen_digits_time
+from core.util import random
 
 
-def jsonp(params: Dict[str, Any], process: Dict[str, Any], fuid: str = None) -> Dict[str, Any]:
+def jsonp(params: Dict[str, Any],
+          fuid: str = None,
+          trace_id: bool = False) -> Dict[str, Any]:
     """
     n.jsonp = function(n, i, s) { s = s || {}, e && e.traceID && e.traceID.createTraceID && (i.traceid =
     e.traceID.createTraceID()); var o = {}; for (var a in i) { var c = i[a]; void 0 !== c && null !== c && (o[a] = c)
@@ -25,8 +27,8 @@ def jsonp(params: Dict[str, Any], process: Dict[str, Any], fuid: str = None) -> 
     s.processData && (t = s.processData(t)), e && e(t) }, { charset: s.charset, queryField: s.queryField,
     timeOut: s.timeOut, onfailure: function() { t && t() } }) } ) }
     """
-    if fuid:
-        params["traceid"] = "070D7101"
+    if trace_id:
+        params["traceid"] = random.random_trace_id()
     var1 = {}
     for k, var4 in params.items():
         if k:
