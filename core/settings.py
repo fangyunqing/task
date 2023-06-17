@@ -11,5 +11,6 @@ default_opt = {
     "account": r"F:\pythonProject\task\core\account.yml",
     "response_len": 10240,
     "image_path": r"F:\pythonProject\task\image",
-    "model_path": r"F:\pythonProject\task\model"
+    "model_path": r"F:\pythonProject\task\model",
+    "sleep_time": 2
 }

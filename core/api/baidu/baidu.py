@@ -11,7 +11,8 @@ import os
 import random
 import re
 import uuid
-from typing import Optional
+from json import JSONDecodeError
+from typing import Optional, List, Union
 from urllib import parse
 
 from aiohttp import ClientResponse
@@ -22,24 +23,24 @@ from core.api import InvokeInfo
 from core.api.abstract_api import AbstractApi
 from core.api.baidu.util import util1, util6, locus
 from core.api.baidu.util.jsonp import jsonp
-from core.util import guid, rsa, screen
+from core.util import rsa, screen
 from core.util.ase import base64_encryption
-from core.util.random import random_callback, jquery_random_call_back
 from core.util.deep_learn import rot_net_captcha
 from core.util.format_response import format1
+from core.util.random import random_callback, jquery_random_call_back
 from core.util.time import thirteen_digits_time
 from settings import IMAGE_PATH
 
 _error = {
-    1: "您输入的帐号格式不正确",
-    2: "用户名或密码有误",
-    3: "验证码不存在或已过期",
-    4: "帐号或密码错误",
-    6: "您输入的验证码有误",
-    7: "用户名或密码有误",
-    16: "您的帐号因安全问题已被限制登录",
-    257: "請輸入驗證碼",
-    120021: "登录失败,请在弹出的窗口操作,或重新登录",
+    "1": "您输入的帐号格式不正确",
+    "2": "用户名或密码有误",
+    "3": "验证码不存在或已过期",
+    "4": "帐号或密码错误",
+    "6": "您输入的验证码有误",
+    "7": "用户名或密码有误",
+    "16": "您的帐号因安全问题已被限制登录",
+    "257": "請輸入驗證碼",
+    "120021": "登录失败,请在弹出的窗口操作,或重新登录",
 }
 
 
@@ -58,8 +59,8 @@ class IndexApi(AbstractApi):
 
 class GetApiApi(AbstractApi):
 
-    def next(self) -> Optional[InvokeInfo]:
-        return InvokeInfo("getpublickey")
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("logincheck")
 
     url = "https://passport.baidu.com/v2/api/?getapi"
     method = constant.hm.get
@@ -81,7 +82,7 @@ class GetApiApi(AbstractApi):
                                   static=False)
 
         self.data = jsonp(params=params)
-        self.data[constant.kw.callback] = random_callback()
+        self.data[constant.kw.callback] = random_callback("bd__cbs__??????")
 
     async def _after(self, response: ClientResponse) -> bool:
         text = await response.text()
@@ -92,10 +93,6 @@ class GetApiApi(AbstractApi):
 
 
 class GetPublicKeyApi(AbstractApi):
-
-    def next(self) -> Optional[InvokeInfo]:
-        return InvokeInfo("logincheck")
-
     url = "https://passport.baidu.com/v2/getpublickey"
     method = constant.hm.get
     api_types = ['baidu']
@@ -115,7 +112,7 @@ class GetPublicKeyApi(AbstractApi):
                                   static=False)
 
         self.data = jsonp(params=params)
-        self.data[constant.kw.callback] = random_callback()
+        self.data[constant.kw.callback] = random_callback("bd__cbs__??????")
 
     async def _after(self, response: ClientResponse) -> bool:
         text = await response.text()
@@ -169,11 +166,11 @@ class ViewLogApi(AbstractApi):
             self.op = None
         return True
 
-    def next(self) -> Optional[InvokeInfo]:
+    def success(self) -> Optional[InvokeInfo]:
         if self.op in [0, 2]:
             return InvokeInfo("getstyle")
         elif self.op == 1:
-            return InvokeInfo("login")
+            return InvokeInfo("login", Munch({"pre_viewlog": False}))
 
 
 class LoginApi(AbstractApi):
@@ -182,9 +179,6 @@ class LoginApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
     err_no = None
-
-    def pre(self) -> Optional[InvokeInfo]:
-        return InvokeInfo("viewlog", Munch({"cv": False}))
 
     def _before(self):
         init_data = {
@@ -247,11 +241,24 @@ class LoginApi(AbstractApi):
                 res[var2[0]] = var2[1]
         assert "err_no" in res
         self.err_no = res["err_no"]
+        if self.err_no in _error:
+            self.task.error(_error[self.err_no])
         return self.err_no == "0"
 
-    def request_if_fail(self) -> Optional[InvokeInfo]:
+    def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+        if self.invoke_config.setdefault("pre_viewlog", True):
+            return [InvokeInfo("getpublickey"), InvokeInfo("viewlog", Munch({"cv": False}))]
+        else:
+            return InvokeInfo("getpublickey")
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("logininfo")
+
+    def fail(self) -> Optional[InvokeInfo]:
         if self.err_no == "6":
             return InvokeInfo("getstyle")
+        elif self.err_no == "120021":
+            return InvokeInfo("login")
 
 
 class GetStyleApi(AbstractApi):
@@ -281,7 +288,7 @@ class GetStyleApi(AbstractApi):
         }
         return True
 
-    def next(self) -> Optional[InvokeInfo]:
+    def success(self) -> Optional[InvokeInfo]:
         return InvokeInfo("verifyimage")
 
 
@@ -366,7 +373,7 @@ class VerifyImageApi(AbstractApi):
             await asyncio.sleep(delay / 1000)
         return True
 
-    def next(self) -> Optional[InvokeInfo]:
+    def success(self) -> Optional[InvokeInfo]:
         return InvokeInfo("viewlog")
 
 
@@ -383,15 +390,23 @@ class LoginInfoApi(AbstractApi):
         }
 
     async def _after(self, response: ClientResponse) -> bool:
-        self.is_login = 0
-        return True
+        text = await response.read()
+        try:
+            text_json = json.loads(text)
+        except JSONDecodeError:
+            self.is_login = 0
+        else:
+            self.is_login = text_json["isLogin"]
+            if self.is_login == 1:
+                self.config.login = text_json
 
-    def next(self) -> Optional[InvokeInfo]:
-        if self.is_login == 0:
-            return InvokeInfo("getapi")
+        return self.is_login == 1
 
-    def pre(self) -> Optional[InvokeInfo]:
+    def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
         return InvokeInfo("index")
+
+    def fail(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("getapi")
 
 
 class LoginCheckApi(AbstractApi):
@@ -425,5 +440,5 @@ class LoginCheckApi(AbstractApi):
     async def _after(self, response: ClientResponse) -> bool:
         return True
 
-    def next(self) -> Optional[InvokeInfo]:
+    def success(self) -> Optional[InvokeInfo]:
         return InvokeInfo("login")

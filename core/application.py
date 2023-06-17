@@ -48,16 +48,19 @@ class Application:
             for api_type in login_cls.api_types:
                 login_cls.apis.update(self.am.get_apis(login_cls.task_type, api_type))
 
+        for schedule_cls_list in self.sm:
+            for schedule_cls in schedule_cls_list:
+                schedule_cls.apis = {}
+                for api_type in schedule_cls.api_types:
+                    schedule_cls.apis.update(self.am.get_apis(schedule_cls.task_type, api_type))
+
     def run(self):
         wait_task_list = []
-        for _ in self.sm.tasks:
-            if isinstance(_, CombinationTask):
-                task = _
-                _.opt = self.opt
-            else:
-                task = _(opt=self.opt)
-            wait_task_list.append(self.lm.login_before_exec(login_name=task.login_name,
-                                                            task=task))
+        for task in self.sm.tasks:
+            for account in self.um.get_account(task.login_name):
+                wait_task_list.append(self.lm.login_before_exec(login_name=task.login_name,
+                                                                task=task,
+                                                                account=account))
         if wait_task_list:
             loop = asyncio.get_event_loop()
             loop.run_until_complete(asyncio.wait(fs=wait_task_list))

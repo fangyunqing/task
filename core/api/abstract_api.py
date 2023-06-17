@@ -6,7 +6,7 @@
 __author__ = 'fyq'
 
 from abc import abstractmethod
-from typing import Optional
+from typing import Optional, Union, List
 
 from aiohttp import ClientSession, ClientResponse
 
@@ -17,13 +17,16 @@ from core.exception import ApiException
 
 class AbstractApi(Api):
 
-    def pre(self) -> Optional[InvokeInfo]:
+    def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+        pass
+
+    def post(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+        pass
+
+    def fail(self) -> Optional[InvokeInfo]:
         return None
 
-    def request_if_fail(self) -> Optional[InvokeInfo]:
-        return None
-
-    def next(self) -> Optional[InvokeInfo]:
+    def success(self) -> Optional[InvokeInfo]:
         return None
 
     @property

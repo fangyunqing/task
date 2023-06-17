@@ -9,7 +9,7 @@ from typing import Optional
 
 from munch import Munch
 
-from core.task.abstract_task import LoginTask
+from core.task.abstract_task import LoginTask, ScheduleTask
 from core.util import guid
 
 
@@ -54,3 +54,14 @@ class BaiduLogin(LoginTask):
 
         }
     })
+
+
+class QuestionScheduleTask(ScheduleTask):
+
+    first_api_name = "homepage"
+
+    api_types = ["question_baidu"]
+
+    login_name = "baidu"
+
+    config = Munch()

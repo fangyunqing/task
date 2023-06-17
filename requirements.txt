@@ -20,7 +20,6 @@ aiohttp==3.8.4
 loguru==0.7.0
 munch==3.0.0
 pycryptodome==3.18.0
-simplejson==3.19.1
 yarl==1.9.2
 PyYAML==6.0
 matplotlib==3.5.3

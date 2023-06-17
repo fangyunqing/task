@@ -41,11 +41,6 @@ class AbstractTask(Task):
     # 任务开始的接口名称
     first_api_name: str
 
-    # 任务的配置项
-    # 提供给接口使用
-    # 接口返回的数据
-    config: Munch = None
-
     # 任务的类型 登录 定时器
     task_type: str
 
@@ -83,22 +78,57 @@ class AbstractTask(Task):
             else:
                 raise TaskException(f"{self.task_sign}未找到下一个接口")
             current_api = next_api_cls(task=self, config=self.config, invoke_config=next_invoker_info.config)
-            if pre_invoker_info := current_api.pre():
-                pre_api_cls: Type[Api] = self.apis.get(pre_invoker_info.api_name)
-                if pre_api_cls:
-                    await pre_api_cls(task=self,
-                                      config=self.config,
-                                      invoke_config=pre_invoker_info.config).request(session=session)
+            if pre_invoke_infos := current_api.pre():
+                if isinstance(pre_invoke_infos, List):
+                    for pre_invoke_info in pre_invoke_infos:
+                        pre_api_cls: Type[Api] = self.apis.get(pre_invoke_info.api_name)
+                        if pre_api_cls:
+                            await asyncio.sleep(self.opt.sleep_time)
+                            await pre_api_cls(task=self,
+                                              config=self.config,
+                                              invoke_config=pre_invoke_info.config).request(session=session)
+                        else:
+                            self.warning(f"{pre_invoke_info.api_name}未注册")
+                else:
+                    pre_api_cls: Type[Api] = self.apis.get(pre_invoke_infos.api_name)
+                    if pre_api_cls:
+                        await asyncio.sleep(self.opt.sleep_time)
+                        await pre_api_cls(task=self,
+                                          config=self.config,
+                                          invoke_config=pre_invoke_infos.config).request(session=session)
+                    else:
+                        self.warning(f"{pre_invoke_infos.api_name}未注册")
+            await asyncio.sleep(self.opt.sleep_time)
             res = await (current_api.request(session=session))
             if not res:
-                next_invoker_info = current_api.request_if_fail()
+                next_invoker_info = current_api.fail()
                 if next_invoker_info is None:
                     break
             else:
-                if current_api.stop or current_api.next() is None:
+                if post_invoke_infos := current_api.post():
+                    if isinstance(pre_invoke_infos, List):
+                        for post_invoke_info in post_invoke_infos:
+                            post_api_cls: Type[Api] = self.apis.get(post_invoke_info.api_name)
+                            if post_api_cls:
+                                await asyncio.sleep(self.opt.sleep_time)
+                                await post_api_cls(task=self,
+                                                   config=self.config,
+                                                   invoke_config=post_invoke_info.config).request(session=session)
+                            else:
+                                self.warning(f"{post_invoke_info.api_name}未注册")
+                    else:
+                        post_api_cls: Type[Api] = self.apis.get(post_invoke_infos.api_name)
+                        if post_api_cls:
+                            await asyncio.sleep(self.opt.sleep_time)
+                            await post_api_cls(task=self,
+                                               config=self.config,
+                                               invoke_config=post_invoke_infos.config).request(session=session)
+                        else:
+                            self.warning(f"{post_invoke_infos.api_name}未注册")
+
+                if current_api.stop or current_api.success() is None:
                     break
-                next_invoker_info = current_api.next()
-            await asyncio.sleep(1)
+                next_invoker_info = current_api.success()
 
     @property
     def task_sign(self):
@@ -127,6 +157,8 @@ class ScheduleTask(AbstractTask):
         return super().__new__(cls, *args, **kwargs)
 
     def __init_subclass__(cls, **kwargs):
+        cls.task_type = constant.kw.schedule
+        cls.task_name = cls.__name__.replace(cls.task_type.title(), "").lower()
         schedule_cls_list.append(cls)
 
     async def exec(self, session: ClientSession):
@@ -168,8 +200,7 @@ class LoginTask(AbstractTask):
         headers = {
             "User-Agent": random_ua()
         }
-        if self.host:
-            headers["Host"] = self.host
+
         if self.referer:
             headers["Referer"] = self.referer
 

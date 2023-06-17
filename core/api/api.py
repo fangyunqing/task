@@ -9,7 +9,7 @@ __author__ = 'fyq'
 
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from typing import List, TYPE_CHECKING, Optional, Type
+from typing import List, TYPE_CHECKING, Optional, Type, Union, Any
 
 from aiohttp import ClientSession
 from munch import Munch
@@ -32,10 +32,11 @@ class Api(ABC):
     """
         所有接口的基类
         定义一个接口用于发起请求
-        发起请求之前 外部调用 pre
-        然后外部调用 request 发送一个执行
-        如果请求被认为失败了 外部调用 request_if_fail
-        如果请求被认为成功了 外部调用 stop and next
+        前置处理 pre
+        然后外部调用 request 发送请求
+        后置处理 post
+        如果请求被认为失败了 外部调用 fail
+        如果请求被认为成功了 外部调用 success
     """
 
     # 接口地址 eg: https://passport.baidu.com/v2/getpublickey
@@ -49,7 +50,7 @@ class Api(ABC):
 
     # 需求传递的参数
     # post get
-    data: dict = {}
+    data: Any = None
 
     # 任务类型
     # login 登录
@@ -82,11 +83,28 @@ class Api(ABC):
             api_cls_list.append(cls)
 
     @abstractmethod
-    def pre(self) -> Optional[InvokeInfo]:
+    def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+        """
+        前置处理
+        :return:
+        """
+        pass
+
+    @abstractmethod
+    def post(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+        """
+        后置处理
+        :return:
+        """
         pass
 
     @abstractmethod
     async def request(self, session: ClientSession) -> bool:
+        """
+        发起请求
+        :param session:
+        :return:
+        """
         pass
 
     @property
@@ -94,11 +112,15 @@ class Api(ABC):
         return f"{self.task_types}-{self.api_types}-{self.api_name}"
 
     @abstractmethod
-    def request_if_fail(self) -> Optional[InvokeInfo]:
+    def fail(self) -> Optional[InvokeInfo]:
         pass
 
     @abstractmethod
-    def next(self) -> Optional[InvokeInfo]:
+    def success(self) -> Optional[InvokeInfo]:
+        """
+        下一个接口
+        :return:
+        """
         pass
 
     @property

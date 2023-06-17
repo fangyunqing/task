@@ -20,6 +20,11 @@ class Task(ABC):
         所有任务的基类
     """
 
+    # 任务的配置项
+    # 提供给接口使用
+    # 接口返回的数据
+    config: Munch = None
+
     def __init__(self, opt: Optional[Munch]):
         self.opt = opt
         self._logger = loguru.logger
@@ -41,5 +46,8 @@ class Task(ABC):
 
     def error(self, message: str):
         self._logger.error(f"{self.task_sign} - {message}")
+
+    def warning(self, message: str):
+        self._logger.warning(f"{self.task_sign} - {message}")
 
 
