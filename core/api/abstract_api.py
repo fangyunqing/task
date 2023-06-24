@@ -34,7 +34,7 @@ class AbstractApi(Api):
         return False
 
     @abstractmethod
-    def _before(self):
+    async def _before(self):
         """
             前置处理
         :return:
@@ -52,30 +52,37 @@ class AbstractApi(Api):
 
     async def request(self, session: ClientSession) -> bool:
 
-        self._before()
+        await self._before()
 
-        if self.method == hm.get:
-            response = await session.get(self.url, params=self.data, proxy=self.task.opt.proxy)
-        elif self.method == hm.post_data:
-            response = await session.post(self.url, data=self.data, proxy=self.task.opt.proxy)
-        elif self.method == hm.post_json:
-            response = await session.post(self.url, json=self.data, proxy=self.task.opt.proxy)
-        elif self.method == hm.delete:
-            response = await session.delete(self.url, proxy=self.task.opt.proxy)
-        elif self.method == hm.head:
-            response = await session.head(self.url, proxy=self.task.opt.proxy)
-        elif self.method == hm.options:
-            response = await session.options(self.url, proxy=self.task.opt.proxy)
-        elif self.method == hm.put:
-            response = await session.put(self.url, data=self.data, proxy=self.task.opt.proxy)
-        else:
-            if self.method:
-                raise ApiException(f"{self.api_sign}的方法{self.method}不支持")
+        if self.can_request:
+            if self.method == hm.get:
+                response = await session.get(self.url, params=self.data, proxy=self.task.opt.proxy)
+            elif self.method == hm.post_data:
+                response = await session.post(self.url, data=self.data, proxy=self.task.opt.proxy)
+            elif self.method == hm.post_json:
+                response = await session.post(self.url, json=self.data, proxy=self.task.opt.proxy)
+            elif self.method == hm.delete:
+                response = await session.delete(self.url, proxy=self.task.opt.proxy)
+            elif self.method == hm.head:
+                response = await session.head(self.url, proxy=self.task.opt.proxy)
+            elif self.method == hm.options:
+                response = await session.options(self.url, proxy=self.task.opt.proxy)
+            elif self.method == hm.put:
+                response = await session.put(self.url, data=self.data, proxy=self.task.opt.proxy)
             else:
-                raise ApiException(f"{self.api_sign}未设置方法")
+                if self.method:
+                    raise ApiException(f"{self.api_sign}的方法{self.method}不支持")
+                else:
+                    raise ApiException(f"{self.api_sign}未设置方法")
 
-        response.raise_for_status()
-        res = await self._after(response)
-        response.close()
-        return res
+            response.raise_for_status()
+            res = await self._after(response)
+            response.close()
+            if res:
+                self.task.info(f"{self.api_name} is success")
+            else:
+                self.task.info(f"{self.api_name} is fail")
+            return res
+        else:
+            return True
 

@@ -81,11 +81,10 @@ class ImitatePoints:
     right_points: List[Point] = field(default_factory=lambda: [])
 
 
-def imitate_locus(side: int, length: int, angel_length: int, errors: int = 10) -> ImitatePoints:
+def imitate_locus(side: int, angel_length: int, errors: int = 10) -> ImitatePoints:
     """
     模拟轨迹
     :param side: 半径
-    :param length: 长度
     :param angel_length: 角度
     :param errors: 错误点个数
     :return:
@@ -125,4 +124,4 @@ def imitate_locus(side: int, length: int, angel_length: int, errors: int = 10) -
 
 
 if __name__ == "__main__":
-    print(imitate_locus(25, 212, 90))
+    print(imitate_locus(25, 90))

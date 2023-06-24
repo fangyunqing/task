@@ -147,7 +147,7 @@ class ScheduleTask(AbstractTask):
 
     # 重复时间
     # 单位秒
-    repeat_time: int = 60
+    repeat_time: int = 450
 
     def __init__(self, opt: Optional[Munch]):
         super(ScheduleTask, self).__init__(opt)
@@ -224,5 +224,8 @@ class CombinationTask(Task):
     def __repr__(self):
         return f"{self.login_name}-{[_.task_sign for _ in self._st_cls_list]}"
 
-    async def exec(self):
-        await asyncio.wait([_(self.opt).exec() for _ in self._st_cls_list])
+    async def exec(self, session: ClientSession):
+        tasks = {}
+        pe = []
+    # async def exec(self, ):
+    #     await asyncio.wait([_(self.opt).exec() for _ in self._st_cls_list])

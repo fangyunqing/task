@@ -12,5 +12,6 @@ default_opt = {
     "response_len": 10240,
     "image_path": r"F:\pythonProject\task\image",
     "model_path": r"F:\pythonProject\task\model",
-    "sleep_time": 2
+    "sleep_time": 2,
+    "cookies_path": r"F:\pythonProject\task\core\cookies"
 }

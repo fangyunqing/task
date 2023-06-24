@@ -26,7 +26,7 @@ def jquery_random_call_back():
     jQuery110207053490627294874_1680752947519
     """
     res = "jQuery"
-    for n in range(0, 21):
+    for n in range(0, 20):
         res += str(int(random.random() * 10))
     res += f"_{thirteen_digits_time()}"
 

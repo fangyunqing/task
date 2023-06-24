@@ -13,24 +13,22 @@ class TestAio(unittest.TestCase):
 
     def test_exception(self):
         async def sleep(delay):
-            await asyncio.sleep(delay)
             try:
-                raise TypeError
-            except TypeError:
-                if delay == 5:
-                    pass
-                else:
-                    raise TypeError
-
-        def _asyncio_exception_handler(lp, context) -> None:
-            pass
+                await asyncio.sleep(delay)
+                print(delay)
+                raise ValueError
+            except asyncio.CancelledError:
+                print("cancel")
 
         loop = asyncio.get_event_loop()
-        loop.set_exception_handler(_asyncio_exception_handler)
 
         task = [
-            sleep(10),
-            sleep(5),
+            asyncio.ensure_future(sleep(10)),
+            asyncio.ensure_future(sleep(5)),
         ]
 
-        loop.run_until_complete(asyncio.wait(task))
+        f, p = loop.run_until_complete(asyncio.wait(task, return_when=asyncio.FIRST_EXCEPTION))
+
+        for pp in p:
+            pp.cancel()
+            loop.run_until_complete(pp)

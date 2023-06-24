@@ -69,6 +69,9 @@ class Api(ABC):
     # 调用此接口的任务
     task: "Task" = None
 
+    # 是否可以接口
+    can_request: bool = True
+
     def __init__(self, task: "Task", config: Munch, invoke_config: Munch):
         self.task = task
         self.config = config

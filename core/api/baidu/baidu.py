@@ -15,21 +15,23 @@ from json import JSONDecodeError
 from typing import Optional, List, Union
 from urllib import parse
 
+import aioconsole
 from aiohttp import ClientResponse
 from munch import Munch
 
 from core import constant
 from core.api import InvokeInfo
 from core.api.abstract_api import AbstractApi
-from core.api.baidu.util import util1, util6, locus
+from core.api.baidu.util import util1, util6, client
 from core.api.baidu.util.jsonp import jsonp
 from core.util import rsa, screen
 from core.util.ase import base64_encryption
 from core.util.deep_learn import rot_net_captcha
 from core.util.format_response import format1
-from core.util.random import random_callback, jquery_random_call_back
+from core.util.random import random_callback, jquery_random_call_back, random_trace_id
 from core.util.time import thirteen_digits_time
 from settings import IMAGE_PATH
+from core.util import locus
 
 _error = {
     "1": "您输入的帐号格式不正确",
@@ -50,8 +52,8 @@ class IndexApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    def _before(self):
-        pass
+    async def _before(self):
+        self.config.client = client.random_client()
 
     async def _after(self, response: ClientResponse) -> bool:
         return True
@@ -67,7 +69,7 @@ class GetApiApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    def _before(self):
+    async def _before(self):
         init_data = {
             "apiType": "login",
             "gid": self.config.gid,
@@ -98,10 +100,11 @@ class GetPublicKeyApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    def _before(self):
+    async def _before(self):
         init_data = {
             "gid": self.config.gid,
             "loginVersion": "v5",
+            "token": self.config.setdefault("token", None)
         }
         sign = "getRsaKey"
 
@@ -130,26 +133,184 @@ class ViewLogApi(AbstractApi):
     task_types = [constant.kw.login]
     op = None
 
-    def _before(self):
-        self.data = {constant.kw.callback: jquery_random_call_back(),
-                     "ak": self.config.store.get("ak", None),
-                     "as": self.config.store.get("nameL", None)}
+    async def _before(self):
+        self.data = {}
+        if self.config.store["nameL"]:
+            if self.invoke_config.setdefault("image_verify", False):
+                model_path = f"{self.task.opt.model_path}{os.sep}rot_net.pth"
+                angle = rot_net_captcha(image_path=self.config.verify_image["image_path"],
+                                        model_path=model_path,
+                                        debug=self.task.opt.debug)
+                self.task.info(f"图片旋转角度[{angle}]")
+                move_length = round(angle * 212 / 360, 0)
+                imitate_points = locus.imitate_locus(client=self.config.client.client,
+                                                     component=self.config.client.image_verify,
+                                                     move_length=move_length,
+                                                     client_point_count=10)
+                start_t = thirteen_digits_time()
+                point_list = []
+                for point in imitate_points.client_points:
+                    start_t += random.randint(190, 210)
+                    point_list.append({
+                        "fx": point.x,
+                        "fy": point.y,
+                        "t": start_t,
+                        "bf": 2
+                    })
+                min_t = point_list[-1]["t"] + 50
+                max_t = point_list[-1]["t"] + 150
+                for point in imitate_points.component_points:
+                    start_t += random.randint(190, 210)
+                    point_list.append({
+                        "fx": point.x,
+                        "fy": point.y,
+                        "t": start_t,
+                        "bf": 1
+                    })
 
-        if self.config.locus:
-            self.task.debug("\n" + "模拟轨迹:" + json.dumps(self.config.locus, indent="   "))
-            self.data["fs"] = (
-                base64_encryption(data=json.dumps(self.config.locus),
-                                  key=self.config.store.get("nameL", "") + self.config.store.get("nameR", "")))
-            if "cv" in self.invoke_config:
-                if self.invoke_config.cv:
-                    self.data["cv"] = "submit"
-            else:
+                data = {
+                    "cl": [
+                        {
+                            "x": imitate_points.click_point.x,
+                            "y": imitate_points.click_point.y,
+                            "t": random.randint(min_t, max_t)
+                        }
+                    ],
+                    "mv": point_list,
+                    "sc": [],
+                    "kb": [],
+                    "sb": [],
+                    "sd": [],
+                    "sm": [],
+                    "cr": {
+                        "screenTop": 0,
+                        "screenLeft": 0,
+                        "clientWidth": self.config.client.client.width,
+                        "clientHeight": self.config.client.client.height,
+                        "screenWidth": screen.screen()[0],
+                        "screenHeight": screen.screen()[1],
+                        "availWidth": screen.avail_screen()[0],
+                        "availHeight": screen.avail_screen()[1],
+                        "outerWidth": screen.outer_screen()[0],
+                        "outerHeight": screen.outer_screen()[1],
+                        "scrollWidth": screen.scroll_screen()[0],
+                        "scrollHeight": screen.scroll_screen()[1]
+                    },
+                    "simu": 0,
+                    "ac_c": round(move_length / 212, 2),
+                    "backstr": self.config.verify_image["backstr"]
+
+                }
+                delay = point_list[-1]["t"] - thirteen_digits_time()
+                if delay > 0:
+                    await asyncio.sleep(delay / 1000)
+                self.data["fs"] = (
+                    base64_encryption(data=json.dumps(data),
+                                      key=self.config.store.get("nameL", "") + self.config.store.get("nameR", "")))
                 self.data["cv"] = "submit"
-        else:
-            self.data["fs"] = None
+            else:
+                if not self.invoke_config.setdefault("login", True):
+                    icp = locus.imitate_client_locus(client=self.config.client.client, point_count=5)
+                    start_t = thirteen_digits_time()
+                    point_list = []
+                    for point in icp.points:
+                        start_t += random.randint(190, 210)
+                        point_list.append({
+                            "fx": point.x,
+                            "fy": point.y,
+                            "t": start_t,
+                            "bf": 2
+                        })
+                    data = {
+                        "cl": [],
+                        "mv": point_list,
+                        "sc": [],
+                        "kb": [],
+                        "sb": [],
+                        "sd": [],
+                        "sm": [],
+                        "cr": {
+                            "screenTop": 0,
+                            "screenLeft": 0,
+                            "clientWidth": self.config.client.client.width,
+                            "clientHeight": self.config.client.client.height,
+                            "screenWidth": screen.screen()[0],
+                            "screenHeight": screen.screen()[1],
+                            "availWidth": screen.avail_screen()[0],
+                            "availHeight": screen.avail_screen()[1],
+                            "outerWidth": screen.outer_screen()[0],
+                            "outerHeight": screen.outer_screen()[1],
+                            "scrollWidth": screen.scroll_screen()[0],
+                            "scrollHeight": screen.scroll_screen()[1]
+                        },
+                        "simu": 0,
+                        "ac_c": 0,
+                    }
+                    delay = point_list[-1]["t"] - thirteen_digits_time()
+                    if delay > 0:
+                        await asyncio.sleep(delay / 1000)
+                    self.data["fs"] = (
+                        base64_encryption(data=json.dumps(data),
+                                          key=self.config.store.get("nameL", "") + self.config.store.get("nameR", "")))
+                else:
+                    imitate_points = locus.imitate_locus(client=self.config.client.client,
+                                                         component=self.config.client.submit,
+                                                         move_length=0,
+                                                         client_point_count=5)
+                    start_t = thirteen_digits_time()
+                    point_list = []
+                    for point in imitate_points.client_points:
+                        start_t += random.randint(190, 210)
+                        point_list.append({
+                            "fx": point.x,
+                            "fy": point.y,
+                            "t": start_t,
+                            "bf": 2
+                        })
 
-        self.data["tk"] = self.config.store.get("tk", None)
-        self.data["scene"] = self.config.store.get("scene", None)
+                    data = {
+                        "cl": [
+                            {
+                                "x": imitate_points.click_point.x,
+                                "y": imitate_points.click_point.y,
+                                "t": point_list[-1]["t"] + 100
+                            }
+                        ],
+                        "mv": point_list,
+                        "sc": [],
+                        "kb": [],
+                        "sb": [],
+                        "sd": [],
+                        "sm": [],
+                        "cr": {
+                            "screenTop": 0,
+                            "screenLeft": 0,
+                            "clientWidth": self.config.client.client.width,
+                            "clientHeight": self.config.client.client.height,
+                            "screenWidth": screen.screen()[0],
+                            "screenHeight": screen.screen()[1],
+                            "availWidth": screen.avail_screen()[0],
+                            "availHeight": screen.avail_screen()[1],
+                            "outerWidth": screen.outer_screen()[0],
+                            "outerHeight": screen.outer_screen()[1],
+                            "scrollWidth": screen.scroll_screen()[0],
+                            "scrollHeight": screen.scroll_screen()[1]
+                        },
+                        "simu": 0,
+                        "ac_c": 0
+                    }
+                    delay = point_list[-1]["t"] - thirteen_digits_time() + 100
+                    if delay > 0:
+                        await asyncio.sleep(delay / 1000)
+                    self.data["fs"] = (
+                        base64_encryption(data=json.dumps(data),
+                                          key=self.config.store.get("nameL", "") + self.config.store.get("nameR", "")))
+            self.data["scene"] = self.config.store.get("scene", None)
+            self.data["as"] = self.config.store.get("nameL", None)
+            self.data["tk"] = self.config.store.get("tk", None)
+
+        self.data[constant.kw.callback] = jquery_random_call_back()
+        self.data["ak"] = self.config.store.get("ak", None)
         self.data["_"] = thirteen_digits_time()
 
     async def _after(self, response: ClientResponse) -> bool:
@@ -170,7 +331,7 @@ class ViewLogApi(AbstractApi):
         if self.op in [0, 2]:
             return InvokeInfo("getstyle")
         elif self.op == 1:
-            return InvokeInfo("login", Munch({"pre_viewlog": False}))
+            return InvokeInfo("login")
 
 
 class LoginApi(AbstractApi):
@@ -180,7 +341,7 @@ class LoginApi(AbstractApi):
     task_types = [constant.kw.login]
     err_no = None
 
-    def _before(self):
+    async def _before(self):
         init_data = {
             "token": self.config.token,
             "subpro": "",
@@ -238,27 +399,26 @@ class LoginApi(AbstractApi):
             if len(var2) == 1:
                 res[var2[0]] = None
             elif len(var2) == 2:
-                res[var2[0]] = var2[1]
+                res[var2[0]] = parse.unquote(var2[1])
         assert "err_no" in res
         self.err_no = res["err_no"]
         if self.err_no in _error:
             self.task.error(_error[self.err_no])
+        self.config.login_response = res
+        self.config.login_response["traceid"] = self.data["traceid"]
         return self.err_no == "0"
 
     def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
-        if self.invoke_config.setdefault("pre_viewlog", True):
-            return [InvokeInfo("getpublickey"), InvokeInfo("viewlog", Munch({"cv": False}))]
-        else:
-            return InvokeInfo("getpublickey")
+        return [InvokeInfo("getpublickey"), InvokeInfo("viewlog", Munch({"login": True}))]
 
     def success(self) -> Optional[InvokeInfo]:
         return InvokeInfo("logininfo")
 
     def fail(self) -> Optional[InvokeInfo]:
         if self.err_no == "6":
-            return InvokeInfo("getstyle")
+            return InvokeInfo("getstyle", Munch({"action": "send"}))
         elif self.err_no == "120021":
-            return InvokeInfo("login")
+            return InvokeInfo("authwidgetverify", Munch({"action": "send"}))
 
 
 class GetStyleApi(AbstractApi):
@@ -267,7 +427,7 @@ class GetStyleApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    def _before(self):
+    async def _before(self):
         self.data = {
             "ak": self.config.store.get("ak", None),
             "tk": self.config.store.get("tk", None),
@@ -298,83 +458,18 @@ class VerifyImageApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    def _before(self):
+    async def _before(self):
         self.url = self.config.verify_image["url"]
 
     async def _after(self, response: ClientResponse) -> bool:
         image_path = f"{IMAGE_PATH}{os.sep}{str(uuid.uuid4())}.jpg"
         with open(image_path, 'wb') as fp:
             fp.write(await response.read())
-        # pytorch计算出图片旋转的角度
-        model_path = f"{self.task.opt.model_path}{os.sep}rot_net.pth"
-        angle = rot_net_captcha(image_path=image_path,
-                                model_path=model_path,
-                                debug=self.task.opt.debug)
-        self.task.info(f"图片旋转角度[{angle}]")
-        angel_length = round(angle * 212 / 360, 0)
-        # 模拟滑动轨迹
-        imitate_points = locus.imitate_locus(25, 212, angel_length)
-        start_t = thirteen_digits_time()
-        point_list = []
-        for point in imitate_points.error_points:
-            start_t += random.randint(190, 210)
-            point_list.append({
-                "fx": point.x,
-                "fy": point.y,
-                "t": start_t,
-                "bf": 2
-            })
-        min_t = point_list[-1]["t"] + 50
-        max_t = point_list[-1]["t"] + 150
-        for point in imitate_points.right_points:
-            start_t += random.randint(190, 210)
-            point_list.append({
-                "fx": point.x,
-                "fy": point.y,
-                "t": start_t,
-                "bf": 1
-            })
-
-        self.config.locus = {
-            "cl": [
-                {
-                    "x": imitate_points.click_point.x,
-                    "y": imitate_points.click_point.y,
-                    "t": random.randint(min_t, max_t)
-                }
-            ],
-            "mv": point_list,
-            "sc": [],
-            "kb": [],
-            "sb": [],
-            "sd": [],
-            "sm": [],
-            "cr": {
-                "screenTop": 0,
-                "screenLeft": 0,
-                "clientWidth": imitate_points.client_width,
-                "clientHeight": imitate_points.client_height,
-                "screenWidth": screen.screen()[0],
-                "screenHeight": screen.screen()[1],
-                "availWidth": screen.avail_screen()[0],
-                "availHeight": screen.avail_screen()[1],
-                "outerWidth": screen.outer_screen()[0],
-                "outerHeight": screen.outer_screen()[1],
-                "scrollWidth": screen.scroll_screen()[0],
-                "scrollHeight": screen.scroll_screen()[1]
-            },
-            "simu": 0,
-            "ac_c": round(angel_length / 212, 2),
-            "backstr": self.config.verify_image["backstr"]
-
-        }
-        delay = point_list[-1]["t"] - thirteen_digits_time()
-        if delay > 0:
-            await asyncio.sleep(delay / 1000)
+        self.config.verify_image["image_path"] = image_path
         return True
 
     def success(self) -> Optional[InvokeInfo]:
-        return InvokeInfo("viewlog")
+        return InvokeInfo("viewlog", Munch({"image_verify": True}))
 
 
 class LoginInfoApi(AbstractApi):
@@ -384,7 +479,7 @@ class LoginInfoApi(AbstractApi):
     task_types = [constant.kw.login]
     is_login: int
 
-    def _before(self):
+    async def _before(self):
         self.data = {
             "t": thirteen_digits_time()
         }
@@ -415,7 +510,7 @@ class LoginCheckApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    def _before(self):
+    async def _before(self):
         init_data = {
             "token": self.config.token,
             "sub_source": "leadsetpwd",
@@ -442,3 +537,65 @@ class LoginCheckApi(AbstractApi):
 
     def success(self) -> Optional[InvokeInfo]:
         return InvokeInfo("login")
+
+    def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+        return InvokeInfo("viewlog")
+
+
+class AuthWidgetVerifyApi(AbstractApi):
+    url = "https://passport.baidu.com/v2/sapi/authwidgetverify"
+    method = constant.hm.get
+    api_types = ['baidu']
+    task_types = [constant.kw.login]
+
+    async def _before(self):
+        action = self.invoke_config.setdefault("action", "send")
+
+        self.data = {
+            "action": action,
+            "apiver": "v3",
+            "authAction": "",
+            "authtoken": self.config.login_response["authtoken"],
+            constant.kw.callback: random_callback("bd__pcbs__??????"),
+            "countrycode": "",
+            "jsonp": 1,
+            "lstr": self.config.login_response["lstr"],
+            "ltoken": self.config.login_response["ltoken"],
+            "needsid": "",
+            "questionAndAnswer": "",
+            "rsakey": "",
+            "subpro": "",
+            "tpl": "ik",
+            "traceid": self.config.login_response["traceid"],
+            "type": "mobile",
+            "u": "https://zhidao.baidu.com/",
+            "vcode": "",
+            "verifychannel": "",
+            "winsdk": ""
+        }
+
+        if action == "check":
+            self.data["secret"] = ""
+            self.data["vcode"] = await aioconsole.ainput('请输入验证码:')
+
+    async def _after(self, response: ClientResponse) -> bool:
+        text = await response.text()
+        m = format1(text, self.data[constant.kw.callback])
+        assert m is not None
+        if m.errno == "110000":
+            return True
+        else:
+            self.task.debug(m.msg)
+            return False
+
+    def success(self) -> Optional[InvokeInfo]:
+        if self.data["action"] == "send":
+            return InvokeInfo("authwidgetverify", Munch({"action": "check"}))
+        else:
+            return InvokeInfo("login")
+
+    def fail(self) -> Optional[InvokeInfo]:
+        if self.data["action"] == "send":
+            pass
+        else:
+            return InvokeInfo("authwidgetverify", Munch({"action": "send"}))

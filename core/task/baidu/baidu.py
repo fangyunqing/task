@@ -5,8 +5,10 @@
 
 __author__ = 'fyq'
 
-from typing import Optional
+import asyncio
+import datetime
 
+from aiohttp import ClientSession
 from munch import Munch
 
 from core.task.abstract_task import LoginTask, ScheduleTask
@@ -44,7 +46,7 @@ class BaiduLogin(LoginTask):
             }
         }),
         "store": Munch({
-            "nameL": "57a4c3ff",
+            "nameL": "",
             "nameR": "appsapi0",
             "ds": "",
             "tk": "",
@@ -58,7 +60,16 @@ class BaiduLogin(LoginTask):
 
 class QuestionScheduleTask(ScheduleTask):
 
-    first_api_name = "homepage"
+    async def exec(self, session: ClientSession):
+        while True:
+            h = datetime.datetime.now().hour
+            if h in list(range(2, 6)):
+                await asyncio.sleep(1800)
+            else:
+                break
+        await super().exec(session)
+
+    first_api_name = "choice"
 
     api_types = ["question_baidu"]
 

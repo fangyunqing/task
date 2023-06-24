@@ -15,3 +15,7 @@ class ApiException(TaskException):
 class NotFoundApiException(ApiException):
     def __init__(self, api_sign: str):
         super().__init__(f"{api_sign} 404")
+
+
+class ReLoginException(ApiException):
+    pass
