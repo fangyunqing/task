@@ -78,7 +78,7 @@ class AbstractTask(Task):
             else:
                 raise TaskException(f"{self.task_sign}未找到下一个接口")
             current_api = next_api_cls(task=self, config=self.config, invoke_config=next_invoker_info.config)
-            if pre_invoke_infos := current_api.pre():
+            if pre_invoke_infos := await current_api.pre():
                 if isinstance(pre_invoke_infos, List):
                     for pre_invoke_info in pre_invoke_infos:
                         pre_api_cls: Type[Api] = self.apis.get(pre_invoke_info.api_name)
@@ -105,7 +105,7 @@ class AbstractTask(Task):
                 if next_invoker_info is None:
                     break
             else:
-                if post_invoke_infos := current_api.post():
+                if post_invoke_infos := await current_api.post():
                     if isinstance(pre_invoke_infos, List):
                         for post_invoke_info in post_invoke_infos:
                             post_api_cls: Type[Api] = self.apis.get(post_invoke_info.api_name)
@@ -198,7 +198,7 @@ class LoginTask(AbstractTask):
     @property
     def headers(self) -> Dict[str, Any]:
         headers = {
-            "User-Agent": random_ua()
+            constant.kw.ua: random_ua()
         }
 
         if self.referer:

@@ -24,14 +24,13 @@ from core.api import InvokeInfo
 from core.api.abstract_api import AbstractApi
 from core.api.baidu.util import util1, util6, client
 from core.api.baidu.util.jsonp import jsonp
+from core.util import locus
 from core.util import rsa, screen
 from core.util.ase import base64_encryption
 from core.util.deep_learn import rot_net_captcha
 from core.util.format_response import format1
-from core.util.random import random_callback, jquery_random_call_back, random_trace_id
+from core.util.random import random_callback, jquery_random_call_back
 from core.util.time import thirteen_digits_time
-from settings import IMAGE_PATH
-from core.util import locus
 
 _error = {
     "1": "您输入的帐号格式不正确",
@@ -408,7 +407,7 @@ class LoginApi(AbstractApi):
         self.config.login_response["traceid"] = self.data["traceid"]
         return self.err_no == "0"
 
-    def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+    async def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
         return [InvokeInfo("getpublickey"), InvokeInfo("viewlog", Munch({"login": True}))]
 
     def success(self) -> Optional[InvokeInfo]:
@@ -462,7 +461,7 @@ class VerifyImageApi(AbstractApi):
         self.url = self.config.verify_image["url"]
 
     async def _after(self, response: ClientResponse) -> bool:
-        image_path = f"{IMAGE_PATH}{os.sep}{str(uuid.uuid4())}.jpg"
+        image_path = f"{self.task.opt.image_path}{os.sep}{str(uuid.uuid4())}.jpg"
         with open(image_path, 'wb') as fp:
             fp.write(await response.read())
         self.config.verify_image["image_path"] = image_path
@@ -497,7 +496,7 @@ class LoginInfoApi(AbstractApi):
 
         return self.is_login == 1
 
-    def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+    async def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
         return InvokeInfo("index")
 
     def fail(self) -> Optional[InvokeInfo]:
@@ -538,7 +537,7 @@ class LoginCheckApi(AbstractApi):
     def success(self) -> Optional[InvokeInfo]:
         return InvokeInfo("login")
 
-    def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+    async def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
         return InvokeInfo("viewlog")
 
 

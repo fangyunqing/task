@@ -15,6 +15,7 @@ from aiohttp import ClientSession, TraceRequestStartParams, TraceRequestEndParam
 from loguru import logger
 from munch import Munch
 
+from core import constant
 from core.account import Account
 from core.exception import ReLoginException
 from core.task.abstract_task import LoginTask, logins_cls_list
@@ -50,11 +51,27 @@ class LoginManager:
             cookie_jar.load(file_path)
         return cookie_jar
 
+    async def save_ua(self, name: str, session: aiohttp.ClientSession):
+        if constant.kw.ua in session.headers:
+            file_path = f"{self._opt.ua_path}{os.sep}{name}.ua"
+            async with aiofiles.open(file_path, mode='w') as f:
+                await f.write(session.headers[constant.kw.ua])
+
+    async def load_ua(self, name: str):
+        file_path = f"{self._opt.ua_path}{os.sep}{name}.ua"
+        if os.path.isfile(file_path):
+            async with aiofiles.open(file_path, mode='r') as f:
+                return await f.read()
+
     async def login_before_exec(self, login_name: str, account: Account, task: Task):
         login_cls = self._logins.get(login_name)
         assert login_cls is not None
         login_task = login_cls(opt=task.opt, account=account)
         cookie_jar = await self.load_cookie(login_name)
+        ua = await self.load_ua(login_name)
+        headers = login_task.headers
+        if ua:
+            headers[constant.kw.ua] = ua
         async with aiohttp.ClientSession(headers=login_task.headers,
                                          trace_configs=self.create_trace_config(),
                                          connector=aiohttp.TCPConnector(ssl=False),
@@ -62,6 +79,7 @@ class LoginManager:
             while True:
                 await login_task.exec(session=session)
                 await self.save_cookie(login_name, session)
+                await self.save_ua(login_name, session)
                 task.config.login = login_task.config.login
                 try:
                     await task.exec(session=session)

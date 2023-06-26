@@ -13,5 +13,6 @@ default_opt = {
     "image_path": r"F:\pythonProject\task\image",
     "model_path": r"F:\pythonProject\task\model",
     "sleep_time": 2,
-    "cookies_path": r"F:\pythonProject\task\core\cookies"
+    "cookies_path": r"F:\pythonProject\task\core\cookies",
+    "ua_path": r"F:\pythonProject\task\core\ua"
 }

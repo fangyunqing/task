@@ -86,7 +86,7 @@ class Api(ABC):
             api_cls_list.append(cls)
 
     @abstractmethod
-    def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+    async def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
         """
         前置处理
         :return:
@@ -94,7 +94,7 @@ class Api(ABC):
         pass
 
     @abstractmethod
-    def post(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+    async def post(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
         """
         后置处理
         :return:

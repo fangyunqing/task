@@ -12,3 +12,5 @@ schedule = "schedule"
 api = "api"
 
 callback = "callback"
+
+ua = "User-Agent"

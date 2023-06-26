@@ -17,10 +17,10 @@ from core.exception import ApiException
 
 class AbstractApi(Api):
 
-    def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+    async def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
         pass
 
-    def post(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+    async def post(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
         pass
 
     def fail(self) -> Optional[InvokeInfo]:
