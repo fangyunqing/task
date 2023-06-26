@@ -24,7 +24,7 @@ from core.util.time import thirteen_digits_time
 import pyparsing as pp
 from urllib import parse
 
-_question_pattern = ("帮我产生包含图片的一篇「{}」不带标题的文章, "
+_question_pattern = ("回答关于「{}」的问题,答案包含图片和文字, "
                      "显示图片请用markdown语法 (https://source.unsplash.com/960×640/?<关键词>)")
 _image_pattern = '<img src="{}" data_time="{}"/>'
 
@@ -33,7 +33,7 @@ class ChoiceApi(AbstractApi):
     api_types = ['question_baidu']
     task_types = [constant.kw.schedule]
     api_names = [
-        "homepage",
+        # "homepage",
         "getqlist319"
     ]
     active_api = None
@@ -142,12 +142,12 @@ class SubmitAjaxApi(AbstractApi):
                 self.can_request = False
                 return
             self.task.info(f"\nq:[{self.config.question}]\na:[{answer.a}]\nsa:[{answer.sa}]")
-            tag = pp.OneOrMore(pp.Word(pp.alphanums + "'."))
-            url = pp.Literal("(") + pp.Literal("https://source.unsplash.com/960x640/?") + tag + pp.Literal("(")
+            tag = pp.OneOrMore(pp.Word(pp.pyparsing_unicode.alphanums + pp.alphanums + "'.,+-*!#$%&"))
+            pp_url = pp.Literal("(") + pp.Literal("https://source.unsplash.com/960x640/?") + tag + pp.Literal(")")
             answers = []
             urls = []
             idx = 0
-            for ps_idx, (u, s, e) in url.scan_string(answer.a):
+            for ps_idx, (u, s, e) in enumerate(pp_url.scan_string(answer.a)):
                 urls.append("".join(u)[1:-1])
                 sub = answer.a[idx:s]
                 if sub:
@@ -160,7 +160,7 @@ class SubmitAjaxApi(AbstractApi):
                 self.config.answer = answer.a
 
             return [InvokeInfo("uploadimage", Munch({"url": url, "tag": f"url{url_idx}"}))
-                    for url_idx, url in urls]
+                    for url_idx, url in enumerate(urls)]
 
     async def _before(self):
         try:
@@ -274,7 +274,7 @@ class UploadImageApi(AbstractApi):
     async def _after(self, response: ClientResponse) -> bool:
         text = await response.text()
         text_json = json.loads(text)
-        if text_json["errno"] == 0:
+        if text_json["errNo"] == 0:
             url = parse.unquote(text_json["url"])
             for answer_idx, answer in enumerate(self.config.answer):
                 if answer == self.invoke_config.tag:

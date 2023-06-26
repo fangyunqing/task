@@ -53,7 +53,7 @@ async def invoke_3d5_turbo(question: str) -> Munch:
     }
     # 发送post请求 , 一般来说，GPT 3.5 在 120秒之内差不多
     try:
-        async with aiohttp.ClientSession(read_timeout=180, conn_timeout=180) as session:
+        async with aiohttp.ClientSession() as session:
             async with session.post(url=url, json=send_data) as response:
                 text = await response.read()
                 if text:
@@ -77,7 +77,8 @@ if __name__ == "__main__":
 
 
     async def invoke():
-        data = await invoke_3d5_turbo("古代过年有哪些习俗？")
+        data = await invoke_3d5_turbo("帮我产生包含图片的一篇「元宵节」不带标题的文章,显示图片请用markdown语法 ("
+                                      "https://source.unsplash.com/960×640/?<关键词>)")
         print(data)
 
 

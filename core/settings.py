@@ -5,14 +5,16 @@
 
 __author__ = 'fyq'
 
+import os
+
 default_opt = {
     "debug": True,
-    "proxy": "http://127.0.0.1:8888",
-    "account": r"F:\pythonProject\task\core\account.yml",
+    "proxy": None,
+    "account": f"core{os.sep}account.yml",
     "response_len": 10240,
-    "image_path": r"F:\pythonProject\task\image",
-    "model_path": r"F:\pythonProject\task\model",
+    "image_path": f"image",
+    "model_path": f"model",
     "sleep_time": 2,
-    "cookies_path": r"F:\pythonProject\task\core\cookies",
-    "ua_path": r"F:\pythonProject\task\core\ua"
+    "cookies_path": f"core{os.sep}cookies",
+    "ua_path": f"core{os.sep}ua"
 }
