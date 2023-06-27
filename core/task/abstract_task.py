@@ -147,7 +147,7 @@ class ScheduleTask(AbstractTask):
 
     # 重复时间
     # 单位秒
-    repeat_time: int = 450
+    repeat_time: int = 300
 
     def __init__(self, opt: Optional[Munch]):
         super(ScheduleTask, self).__init__(opt)

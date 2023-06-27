@@ -5,14 +5,17 @@
 
 __author__ = 'fyq'
 
-import copy
+import glob
 import json
 import os
 import random
+import time
 import uuid
 from typing import Optional, List, Union
+from urllib import parse
 
 import aiohttp
+import pyparsing as pp
 from aiohttp import ClientResponse
 from munch import Munch
 
@@ -21,19 +24,20 @@ from core.api import InvokeInfo
 from core.api.abstract_api import AbstractApi
 from core.api.baidu.util import utdata
 from core.util.time import thirteen_digits_time
-import pyparsing as pp
-from urllib import parse
 
-_question_pattern = ("回答关于「{}」的问题,答案包含图片和文字, "
-                     "显示图片请用markdown语法 (https://source.unsplash.com/960×640/?<关键词>)")
-_image_pattern = '<img src="{}" data_time="{}"/>'
+_IMAGE_SOURCE = "https://source.unsplash.com/960x640/?"
+
+_QUESTION_PATTERN = ("你是一个资深的答主,"
+                     "帮我回答关于「{}」的问题,要求答案包含相关图片,字数在500到1000之间,图片要尽量和答案匹配,"
+                     "显示图片请用markdown语法 (" + _IMAGE_SOURCE + "<关键词>)")
+_IMAGE_PATTERN = '<p><img src="{}" data_time="{}"/></p>'
 
 
 class ChoiceApi(AbstractApi):
     api_types = ['question_baidu']
     task_types = [constant.kw.schedule]
     api_names = [
-        # "homepage",
+        "homepage",
         "getqlist319"
     ]
     active_api = None
@@ -41,6 +45,8 @@ class ChoiceApi(AbstractApi):
     async def _before(self):
         self.can_request = False
         self.active_api = random.choice(self.api_names)
+        for file in glob.glob(f"{self.task.opt.image_path}{os.sep}answer{os.sep}*"):
+            os.remove(file)
 
     async def _after(self, response: ClientResponse) -> bool:
         pass
@@ -54,6 +60,9 @@ class GetQList319Api(AbstractApi):
     method = constant.hm.get
     api_types = ['question_baidu']
     task_types = [constant.kw.schedule]
+    ASK_PATTERN = "[{}]问题是否询问习俗还是节日?节日回复1,风俗回复2,都是不是回复3"
+    HOLIDAY_PATTERN = "{},节日由来,相关典故,寓意,庆祝方式以及相关扩展"
+    CUSTOM_PATTERN = "{},习俗的详细介绍/来源解释,列举相关习俗案例以及相关扩展"
 
     async def _before(self):
         self.data = {
@@ -68,7 +77,17 @@ class GetQList319Api(AbstractApi):
             q_len = len(question_list)
             if q_len > 0:
                 question = question_list[random.randint(0, q_len - 1)]
-                self.config.question = _question_pattern.format(f"{question['qTitle']}")
+
+                ask_answer = await chatgpt.invoke_3d5_turbo(self.ASK_PATTERN.format(question['qTitle']))
+                if ask_answer is None or ask_answer.a == "3":
+                    self.config.question = _QUESTION_PATTERN.format(f"{question['qTitle']}")
+                elif ask_answer.a == "2":
+                    self.config.question = _QUESTION_PATTERN.format(self.CUSTOM_PATTERN.format(f"{question['qTitle']}"))
+                else:
+                    self.config.question = _QUESTION_PATTERN.format(
+                        self.HOLIDAY_PATTERN.format(f"{question['qTitle']}")
+                    )
+
                 self.config.qid = question["encodeQid"]
                 self.config.entry = "iknowduck_92"
                 return True
@@ -86,6 +105,7 @@ class HomePageApi(AbstractApi):
     method = constant.hm.post_data
     api_types = ['question_baidu']
     task_types = [constant.kw.schedule]
+    tags = ["动漫", "电视剧", "单机游戏"]
 
     async def _before(self):
         self.data = {
@@ -93,7 +113,7 @@ class HomePageApi(AbstractApi):
             "rn": 20,
             "ie": "utf8",
             "type": "highScore",
-            "tag": "",
+            "tag": random.choice(self.tags),
             "cid": "",
             "keyWord": "",
             "category": "",
@@ -114,7 +134,7 @@ class HomePageApi(AbstractApi):
                 content: str = question['content'].strip()
                 title: str = question['title'].strip()
                 if content or title:
-                    self.config.question = _question_pattern.format(f"{title}.{content}")
+                    self.config.question = _QUESTION_PATTERN.format(f"{title}.{content}")
                     self.config.entry = "list_highScore_all"
                     self.config.qid = question["qid"]
                     return True
@@ -149,11 +169,15 @@ class SubmitAjaxApi(AbstractApi):
             idx = 0
             for ps_idx, (u, s, e) in enumerate(pp_url.scan_string(answer.a)):
                 urls.append("".join(u)[1:-1])
-                sub = answer.a[idx:s]
+                sub: str = answer.a[idx:s]
+                sub_idx = sub.index("![")
+                if sub_idx > 0:
+                    sub = sub[0: sub_idx]
                 if sub:
                     answers.append(sub)
                 answers.append(f"url{ps_idx}")
                 idx = e
+            answers.append(answer.a[idx:])
             if urls:
                 self.config.answer = answers
             else:
@@ -163,25 +187,29 @@ class SubmitAjaxApi(AbstractApi):
                     for url_idx, url in enumerate(urls)]
 
     async def _before(self):
-        try:
-            if isinstance(self.config.answer, List):
-                self.config.answer = "".join([a for a in self.config.answer if not a.startswith("url")])
-            self.data = {
-                "cm": 100009,
-                "qid": self.config.qid,
-                "title": "",
-                "answerfr": "",
-                "feedback": 0,
-                "entry": self.config.entry,
-                "co": f"<p>{self.config.answer}<p>",
-                "cite": "",
-                "rich": 1,
-                "edit": "new",
-                "utdata": utdata.utdata(thirteen_digits_time(), thirteen_digits_time()),
-                "stoken": self.config.login["stoken"]
-            }
-        except Exception as e:
-            self.task.error(str(e))
+        if self.can_request:
+            try:
+                if isinstance(self.config.answer, List):
+                    self.config.answer = "".join([a for a in self.config.answer if not a.startswith("url")])
+                if _IMAGE_SOURCE in self.config.answer:
+                    self.can_request = False
+                    return
+                self.data = {
+                    "cm": 100009,
+                    "qid": self.config.qid,
+                    "title": "",
+                    "answerfr": "",
+                    "feedback": 0,
+                    "entry": self.config.entry,
+                    "co": f"<p>{self.config.answer}<p>",
+                    "cite": "",
+                    "rich": 1,
+                    "edit": "new",
+                    "utdata": utdata.utdata(thirteen_digits_time(), thirteen_digits_time()),
+                    "stoken": self.config.login["stoken"]
+                }
+            except Exception as e:
+                self.task.exception(str(e))
 
     async def _after(self, response: ClientResponse) -> bool:
         return True
@@ -263,23 +291,48 @@ class UploadImageApi(AbstractApi):
                         image_path = f"{self.task.opt.image_path}{os.sep}answer"
                         if not os.path.exists(image_path):
                             os.makedirs(image_path)
-                        answer_image_path = f"{image_path}{os.sep}{uuid.uuid4()}.jpg"
+                        image_name = f"{uuid.uuid4()}.jpg"
+                        answer_image_path = f"{image_path}{os.sep}{image_name}"
                         with open(answer_image_path, 'wb') as fp:
                             fp.write(await response.read())
-                        self.data = {'file': open(answer_image_path, 'rb')}
+                        self.data: aiohttp.FormData = aiohttp.FormData()
+                        self.data.add_field(name="image",
+                                            value=open(answer_image_path, "rb"),
+                                            filename=image_name,
+                                            content_type="image/jpeg")
+                        self.data.add_field(name="width",
+                                            value="960")
+                        self.data.add_field(name="height",
+                                            value="640")
+                        self.data.add_field(name="cm",
+                                            value="100672")
+                        self.data.add_field(name="id",
+                                            value="WU_FILE_0")
+                        self.data.add_field(name="name",
+                                            value=image_name)
+                        self.data.add_field(name="type",
+                                            value="image/jpeg")
+                        self.data.add_field(name="size",
+                                            value=str(os.path.getsize(answer_image_path)))
+                        gmt_format = '%a %b %d %Y %H:%M:%S GMT+0800 (中国标准时间)'
+                        self.data.add_field(name="lastModifiedDate",
+                                            value=time.strftime(gmt_format, time.localtime(
+                                                int(os.path.getmtime(answer_image_path))
+                                            )))
+                    else:
+                        self.can_request = False
         except Exception as e:
-            self.task.error(str(e))
+            self.task.exception(str(e))
             self.can_request = False
 
     async def _after(self, response: ClientResponse) -> bool:
         text = await response.text()
         text_json = json.loads(text)
-        if text_json["errNo"] == 0:
+        if text_json["errorNo"] == "0":
             url = parse.unquote(text_json["url"])
             for answer_idx, answer in enumerate(self.config.answer):
                 if answer == self.invoke_config.tag:
-                    self.config.answers[answer_idx] = copy.copy(_image_pattern)
-                    self.config.answers[answer_idx].format((url, thirteen_digits_time()))
+                    self.config.answer[answer_idx] = _IMAGE_PATTERN.format(url, thirteen_digits_time())
                     return True
             return False
         return False

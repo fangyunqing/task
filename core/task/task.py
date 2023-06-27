@@ -50,4 +50,7 @@ class Task(ABC):
     def warning(self, message: str):
         self._logger.warning(f"{self.task_sign} - {message}")
 
+    def exception(self, message: str):
+        self._logger.exception(message)
+
 

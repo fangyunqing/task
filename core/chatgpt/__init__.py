@@ -77,8 +77,7 @@ if __name__ == "__main__":
 
 
     async def invoke():
-        data = await invoke_3d5_turbo("帮我产生包含图片的一篇「元宵节」不带标题的文章,显示图片请用markdown语法 ("
-                                      "https://source.unsplash.com/960×640/?<关键词>)")
+        data = await invoke_3d5_turbo("你是一个资深的医生, 帮我随机创作一篇关于预防某种疾病的文章")
         print(data)
 
 

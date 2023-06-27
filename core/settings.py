@@ -9,7 +9,7 @@ import os
 
 default_opt = {
     "debug": True,
-    "proxy": None,
+    "proxy": "http://127.0.0.1:8888",
     "account": f"core{os.sep}account.yml",
     "response_len": 10240,
     "image_path": f"image",
