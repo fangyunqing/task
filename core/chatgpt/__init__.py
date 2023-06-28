@@ -29,8 +29,8 @@ _invalid_phrases = ["语言模型",
 
 async def invoke_3d5_turbo(question: str) -> Munch:
     url = ("https://api-gpt-api.douzhuli.shop/chatgpt/create?"
-           "securityKey=lUizUqi48FlTncb5k5Vz8au2lhHiZ3rlMkPAPGkp2xf76r86WKlJdFwJjIoS&"
-           "_token_=61bee9b96d592c0a325cc21767e115cd44be0c33b352cb62e9fb7253c8560a21")
+           "securityKey=QQzImz0a1ImzOBapVquS3Pt1BQ9dxMrN0TPwXNmMSnOP8Gm3ozzwrMy1iySm&"
+           "_token_=720a95f77ab3545a2d8cb00bc07f45cc3ed05a010d18071e9f987b7e990c386a")
 
     # 发送数据
     send_data = {
