@@ -11,7 +11,7 @@ import asyncio
 from typing import Type, Dict, Any, List, Optional
 
 import loguru
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientResponseError
 from munch import Munch
 
 from core import constant
@@ -106,7 +106,7 @@ class AbstractTask(Task):
                     break
             else:
                 if post_invoke_infos := await current_api.post():
-                    if isinstance(pre_invoke_infos, List):
+                    if isinstance(post_invoke_infos, List):
                         for post_invoke_info in post_invoke_infos:
                             post_api_cls: Type[Api] = self.apis.get(post_invoke_info.api_name)
                             if post_api_cls:
@@ -147,7 +147,7 @@ class ScheduleTask(AbstractTask):
 
     # 重复时间
     # 单位秒
-    repeat_time: int = 300
+    repeat_time: int = 150
 
     def __init__(self, opt: Optional[Munch]):
         super(ScheduleTask, self).__init__(opt)
@@ -163,17 +163,21 @@ class ScheduleTask(AbstractTask):
 
     async def exec(self, session: ClientSession):
         while True:
-            await super().exec(session=session)
-            await asyncio.sleep(self.repeat_time)
+            try:
+                await super().exec(session=session)
+            except ClientResponseError as e:
+                if e.status == 500:
+                    pass
+                else:
+                    raise e
+            finally:
+                await asyncio.sleep(self.repeat_time)
 
 
 class LoginTask(AbstractTask):
     """
     登录任务
     """
-
-    # header host
-    host = ""
 
     # 来源
     referer = ""

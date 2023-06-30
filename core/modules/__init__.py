@@ -8,5 +8,6 @@ __author__ = 'fyq'
 modules = [
     "core.task.baidu.baidu",
     "core.api.baidu.baidu",
-    "core.api.baidu.question"
+    "core.api.baidu.question",
+    "core.task.toutiao.toutiao"
 ]

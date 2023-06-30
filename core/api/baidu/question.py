@@ -27,10 +27,19 @@ from core.util.time import thirteen_digits_time
 
 _IMAGE_SOURCE = "https://source.unsplash.com/960x640/?"
 
-_QUESTION_PATTERN = ("你是一个资深的答主,"
-                     "帮我回答关于「{}」的问题,要求答案包含相关图片,字数在500到1000之间,图片要尽量和答案匹配,"
-                     "显示图片请用markdown语法 (" + _IMAGE_SOURCE + "<关键词>)")
+_QUESTION_IMAGE_PATTERN = ("你是一个资深风趣的优质答主,"
+                           "帮我回答关于「{}」的问题,要求答案包含相关图片,字数在500到1000之间,图片要尽量和答案匹配,"
+                           "显示图片请用markdown语法 (" + _IMAGE_SOURCE + "<关键词>)")
+_QUESTION_PATTERN = ("你是一个资深风趣的优质答主,"
+                     "帮我回答关于「{}」的问题,字数在500到1000之间")
 _IMAGE_PATTERN = '<p><img src="{}" data_time="{}"/></p>'
+
+
+def _q_format(q):
+    if 0 <= random.randint(0, 10) <= 2:
+        return _QUESTION_IMAGE_PATTERN.format(q)
+    else:
+        return _QUESTION_PATTERN.format(q)
 
 
 class ChoiceApi(AbstractApi):
@@ -61,8 +70,8 @@ class GetQList319Api(AbstractApi):
     api_types = ['question_baidu']
     task_types = [constant.kw.schedule]
     ASK_PATTERN = "[{}]问题是否询问习俗还是节日?节日回复1,风俗回复2,都是不是回复3"
-    HOLIDAY_PATTERN = "{},节日由来,相关典故,寓意,庆祝方式以及相关扩展"
-    CUSTOM_PATTERN = "{},习俗的详细介绍/来源解释,列举相关习俗案例以及相关扩展"
+    HOLIDAY_PATTERN = "{},节日由来,相关典故,寓意,庆祝方式,相关扩展"
+    CUSTOM_PATTERN = "{},习俗的详细介绍/来源解释,列举相关习俗案例,相关扩展"
 
     async def _before(self):
         self.data = {
@@ -80,11 +89,11 @@ class GetQList319Api(AbstractApi):
 
                 ask_answer = await chatgpt.invoke_3d5_turbo(self.ASK_PATTERN.format(question['qTitle']))
                 if ask_answer is None or ask_answer.a == "3":
-                    self.config.question = _QUESTION_PATTERN.format(f"{question['qTitle']}")
+                    self.config.question = _q_format(f"{question['qTitle']}")
                 elif ask_answer.a == "2":
-                    self.config.question = _QUESTION_PATTERN.format(self.CUSTOM_PATTERN.format(f"{question['qTitle']}"))
+                    self.config.question = _q_format(self.CUSTOM_PATTERN.format(f"{question['qTitle']}"))
                 else:
-                    self.config.question = _QUESTION_PATTERN.format(
+                    self.config.question = _q_format(
                         self.HOLIDAY_PATTERN.format(f"{question['qTitle']}")
                     )
 
@@ -105,7 +114,7 @@ class HomePageApi(AbstractApi):
     method = constant.hm.post_data
     api_types = ['question_baidu']
     task_types = [constant.kw.schedule]
-    tags = ["动漫", "电视剧", "单机游戏"]
+    tags = ["动漫", "电视剧", "单机游戏", "节日", "习俗", "装修"]
 
     async def _before(self):
         self.data = {
@@ -134,7 +143,7 @@ class HomePageApi(AbstractApi):
                 content: str = question['content'].strip()
                 title: str = question['title'].strip()
                 if content or title:
-                    self.config.question = _QUESTION_PATTERN.format(f"{title}.{content}")
+                    self.config.question = _q_format(f"{title}.{content}")
                     self.config.entry = "list_highScore_all"
                     self.config.qid = question["qid"]
                     return True
@@ -163,14 +172,14 @@ class SubmitAjaxApi(AbstractApi):
                 return
             self.task.info(f"\nq:[{self.config.question}]\na:[{answer.a}]\nsa:[{answer.sa}]")
             tag = pp.OneOrMore(pp.Word(pp.pyparsing_unicode.alphanums + pp.alphanums + "'.,+-*!#$%&"))
-            pp_url = pp.Literal("(") + pp.Literal("https://source.unsplash.com/960x640/?") + tag + pp.Literal(")")
+            pp_url = pp.Literal("(") + pp.Literal(_IMAGE_SOURCE) + tag + pp.Literal(")")
             answers = []
             urls = []
             idx = 0
             for ps_idx, (u, s, e) in enumerate(pp_url.scan_string(answer.a)):
                 urls.append("".join(u)[1:-1])
                 sub: str = answer.a[idx:s]
-                sub_idx = sub.index("![")
+                sub_idx = sub.find("![")
                 if sub_idx > 0:
                     sub = sub[0: sub_idx]
                 if sub:
@@ -208,6 +217,8 @@ class SubmitAjaxApi(AbstractApi):
                     "utdata": utdata.utdata(thirteen_digits_time(), thirteen_digits_time()),
                     "stoken": self.config.login["stoken"]
                 }
+                if not self.config.task_sign:
+                    self.data["taskfr"] = "taskSign"
             except Exception as e:
                 self.task.exception(str(e))
 
@@ -223,6 +234,7 @@ class MyAnswerApi(AbstractApi):
     method = constant.hm.get
     api_types = ['question_baidu']
     task_types = [constant.kw.schedule]
+    appeal = None
 
     async def _before(self):
         self.data = {
@@ -233,6 +245,7 @@ class MyAnswerApi(AbstractApi):
         }
 
     async def _after(self, response: ClientResponse) -> bool:
+        self.appeal = None
         text = await response.text()
         text_json = json.loads(text)
         if text_json["errno"] == 0:
@@ -244,17 +257,24 @@ class MyAnswerApi(AbstractApi):
                         and question["deleted_by_self"] == 0
                         and question["isReview"] == 0
                 ):
-                    self.config.appeal = {
+                    self.appeal = Munch({
                         "qid": question["qid"],
                         "aid": question["replyId"]
-                    }
+                    })
                     return True
             return False
         else:
             return False
 
+    async def post(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+        if self.appeal:
+            return InvokeInfo("appeal", self.appeal)
+
     def success(self) -> Optional[InvokeInfo]:
-        return InvokeInfo("appeal")
+        return InvokeInfo("mytask")
+
+    def fail(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("mytask")
 
 
 class AppealApi(AbstractApi):
@@ -266,9 +286,9 @@ class AppealApi(AbstractApi):
     async def _before(self):
         self.data = {
             "cm": 100043,
-            "qid": self.config.appeal["qid"],
+            "qid": self.invoke_config.qid,
             "type": 100009,
-            "aid": self.config.appeal["aid"],
+            "aid": self.invoke_config.aid,
             "utdata": utdata.utdata(thirteen_digits_time(), thirteen_digits_time()),
             "stoken": self.config.login["stoken"]
         }
@@ -286,41 +306,51 @@ class UploadImageApi(AbstractApi):
     async def _before(self):
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url=self.invoke_config.url) as response:
-                    if response.status == 200:
-                        image_path = f"{self.task.opt.image_path}{os.sep}answer"
-                        if not os.path.exists(image_path):
-                            os.makedirs(image_path)
-                        image_name = f"{uuid.uuid4()}.jpg"
-                        answer_image_path = f"{image_path}{os.sep}{image_name}"
-                        with open(answer_image_path, 'wb') as fp:
-                            fp.write(await response.read())
-                        self.data: aiohttp.FormData = aiohttp.FormData()
-                        self.data.add_field(name="image",
-                                            value=open(answer_image_path, "rb"),
-                                            filename=image_name,
-                                            content_type="image/jpeg")
-                        self.data.add_field(name="width",
-                                            value="960")
-                        self.data.add_field(name="height",
-                                            value="640")
-                        self.data.add_field(name="cm",
-                                            value="100672")
-                        self.data.add_field(name="id",
-                                            value="WU_FILE_0")
-                        self.data.add_field(name="name",
-                                            value=image_name)
-                        self.data.add_field(name="type",
-                                            value="image/jpeg")
-                        self.data.add_field(name="size",
-                                            value=str(os.path.getsize(answer_image_path)))
-                        gmt_format = '%a %b %d %Y %H:%M:%S GMT+0800 (中国标准时间)'
-                        self.data.add_field(name="lastModifiedDate",
-                                            value=time.strftime(gmt_format, time.localtime(
-                                                int(os.path.getmtime(answer_image_path))
-                                            )))
-                    else:
-                        self.can_request = False
+                image_url = self.invoke_config.url
+                while True:
+                    async with session.get(url=image_url, allow_redirects=False) as response:
+                        if response.status == 302:
+                            redirect_url = response.headers["Location"]
+                            if "source-404" in redirect_url:
+                                self.can_request = False
+                                break
+                            image_url = redirect_url
+                        elif response.status == 200:
+                            image_path = f"{self.task.opt.image_path}{os.sep}answer"
+                            if not os.path.exists(image_path):
+                                os.makedirs(image_path)
+                            image_name = f"{uuid.uuid4()}.jpg"
+                            answer_image_path = f"{image_path}{os.sep}{image_name}"
+                            with open(answer_image_path, 'wb') as fp:
+                                fp.write(await response.read())
+                            self.data: aiohttp.FormData = aiohttp.FormData()
+                            self.data.add_field(name="image",
+                                                value=open(answer_image_path, "rb"),
+                                                filename=image_name,
+                                                content_type="image/jpeg")
+                            self.data.add_field(name="width",
+                                                value="960")
+                            self.data.add_field(name="height",
+                                                value="640")
+                            self.data.add_field(name="cm",
+                                                value="100672")
+                            self.data.add_field(name="id",
+                                                value="WU_FILE_0")
+                            self.data.add_field(name="name",
+                                                value=image_name)
+                            self.data.add_field(name="type",
+                                                value="image/jpeg")
+                            self.data.add_field(name="size",
+                                                value=str(os.path.getsize(answer_image_path)))
+                            gmt_format = '%a %b %d %Y %H:%M:%S GMT+0800 (中国标准时间)'
+                            self.data.add_field(name="lastModifiedDate",
+                                                value=time.strftime(gmt_format, time.localtime(
+                                                    int(os.path.getmtime(answer_image_path))
+                                                )))
+                            break
+                        else:
+                            self.can_request = False
+                            break
         except Exception as e:
             self.task.exception(str(e))
             self.can_request = False
@@ -336,3 +366,207 @@ class UploadImageApi(AbstractApi):
                     return True
             return False
         return False
+
+
+class MyTaskApi(AbstractApi):
+    url = "https://zhidao.baidu.com/task/api/mytask"
+    method = constant.hm.get
+    api_types = ['question_baidu']
+    task_types = [constant.kw.schedule]
+    task_id_list = []
+    task_name_list = ["conDailyTask", "dailyTask", "growupTask"]
+    task_sign = "taskSignInfo"
+
+    async def _before(self):
+        self.data = {
+            "fr": "pc",
+            "_": thirteen_digits_time()
+        }
+
+    def handle_task(self, task):
+        if isinstance(task, list):
+            for sub_task in task:
+                if "target" in sub_task and "taskProgress" in sub_task and "taskStatus" in sub_task:
+                    task_status = sub_task["taskStatus"]
+                    # 2代表问题已经回答完毕 可以领取
+                    if task_status == 2 and "taskId" in sub_task:
+                        self.task_id_list.append(sub_task["taskId"])
+                    if sub_task["name"]:
+                        task_name = sub_task["name"]
+                        if task_name == "点赞":
+                            if task_status == 1:
+                                self.config.like = False
+                            else:
+                                self.config.like = True
+                        elif task_name == "评论":
+                            if task_status == 1:
+                                self.config.comment = False
+                            else:
+                                self.config.comment = True
+        elif isinstance(task, dict):
+            for _, sub_task in task.items():
+                self.handle_task(sub_task)
+
+    async def _after(self, response: ClientResponse) -> bool:
+        self.task_id_list = []
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json["errno"] == 0:
+            for task_name, task in text_json["data"].items():
+                if task_name in self.task_name_list:
+                    self.handle_task(task)
+                if task_name == self.task_sign:
+                    if isinstance(task, list) and len(task) > 0:
+                        sub_task = task[0]
+                        if sub_task["status"] == 1:
+                            self.config.task_sign = False
+                        else:
+                            self.config.task_sign = True
+                    else:
+                        self.config.task_sign = True
+            return True
+        else:
+            return False
+
+    async def post(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+        return [InvokeInfo("tasksubmit", Munch({"task_id": task_id})) for task_id in self.task_id_list]
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("question")
+
+    def fail(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("question")
+
+
+class TaskSubmit(AbstractApi):
+    url = "https://zhidao.baidu.com/task/submit/getreward"
+    method = constant.hm.post_data
+    api_types = ['question_baidu']
+    task_types = [constant.kw.schedule]
+
+    async def _before(self):
+        self.data = {
+            "stoken": self.config.login["stoken"],
+            "taskId": self.invoke_config.task_id
+        }
+
+    async def _after(self, response: ClientResponse) -> bool:
+        pass
+
+
+class QuestionApi(AbstractApi):
+    url = "https://zhidao.baidu.com/ihome/api/push"
+    method = constant.hm.post_data
+    api_types = ['question_baidu']
+    task_types = [constant.kw.schedule]
+    q = None
+
+    async def _before(self):
+        self.data = {
+            "pn": 0,
+            "rn": 20,
+            "type": "newRecommend",
+            "keyInTag": "1",
+            "filter": "",
+            "t": thirteen_digits_time(),
+            "tag": "",
+            "isMavin": "",
+            "vcode_str": "",
+            "vcode": "",
+            "isAll": "",
+            "isExpGroup": ""
+        }
+
+    async def _after(self, response: ClientResponse) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json["errno"] == 0:
+            q_list = text_json["data"]["detail"]
+            q_list = [q for q in q_list
+                      if q["replyNum"] > 0]
+            if len(q_list) > 0:
+                self.q = random.choice(q_list)
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("viewquestion", Munch(self.q))
+
+
+class ViewQuestionApi(AbstractApi):
+    url = "https://zhidao.baidu.com/question/{}.html?entry=qb_uhome_tag"
+    method = constant.hm.get
+    api_types = ['question_baidu']
+    task_types = [constant.kw.schedule]
+    aid_list = []
+
+    async def _before(self):
+        self.url = self.url.format(self.invoke_config.qid)
+
+    async def _after(self, response: ClientResponse) -> bool:
+        self.aid_list = []
+        try:
+            text = await response.text(encoding="utf-8")
+        except UnicodeDecodeError:
+            return False
+        u = (
+                pp.Literal("answer-content-") + pp.Word(pp.nums, exact=10)
+        )
+        for ps, _, _ in u.scan_string(text):
+            self.aid_list.append("".join(ps).replace("answer-content-", ""))
+        return True
+
+    async def post(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+        invoke_list = []
+        if self.aid_list:
+            if not self.config.like:
+                invoke_list.append(InvokeInfo("like", Munch({"qid": self.invoke_config.qid,
+                                                             "aid": random.choice(self.aid_list)})))
+            if not self.config.comment:
+                invoke_list.append(InvokeInfo("comment", Munch({"qid": self.invoke_config.qid,
+                                                                "aid": random.choice(self.aid_list)})))
+        return invoke_list
+
+
+class LikeApi(AbstractApi):
+    url = "https://zhidao.baidu.com/submit/ajax/"
+    method = constant.hm.post_data
+    api_types = ['question_baidu']
+    task_types = [constant.kw.schedule]
+
+    async def _before(self):
+        self.data = {
+            "cm": "100669",
+            "qid": self.invoke_config.qid,
+            "aid": self.invoke_config.aid,
+            "type": 1,
+            "utdata": utdata.utdata(thirteen_digits_time(), thirteen_digits_time()),
+            "stoken": self.config.login["stoken"]
+        }
+
+    async def _after(self, response: ClientResponse) -> bool:
+        return True
+
+
+class CommentApi(AbstractApi):
+    url = "https://zhidao.baidu.com/submit/comment/comment"
+    method = constant.hm.get
+    api_types = ['question_baidu']
+    task_types = [constant.kw.schedule]
+    comment_list = ["不错", "很好,是我需要的", "厉害啊我的哥"]
+
+    async def _before(self):
+        self.data = {
+            "qid": self.invoke_config.qid,
+            "rid": self.invoke_config.aid,
+            "content": random.choice(self.comment_list),
+            "stoken": self.config.login["stoken"],
+            "from": "pc",
+            "_": thirteen_digits_time()
+        }
+
+    async def _after(self, response: ClientResponse) -> bool:
+        return True

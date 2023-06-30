@@ -75,4 +75,8 @@ class QuestionScheduleTask(ScheduleTask):
 
     login_name = "baidu"
 
-    config = Munch()
+    config = Munch({
+        "task_sign": True,
+        "like": True,
+        "comment": True
+    })

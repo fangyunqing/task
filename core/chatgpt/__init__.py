@@ -24,6 +24,7 @@ _invalid_phrases = ["语言模型",
                     "尽力回答",
                     "更多的信息和图片",
                     "提供解答",
+                    "提供的信息有限",
                     "提供帮助"]
 
 
@@ -77,7 +78,7 @@ if __name__ == "__main__":
 
 
     async def invoke():
-        data = await invoke_3d5_turbo("你是一个资深的医生, 帮我随机创作一篇关于预防某种疾病的文章")
+        data = await invoke_3d5_turbo("你好")
         print(data)
 
 
