@@ -28,10 +28,10 @@ from core.util.time import thirteen_digits_time
 _IMAGE_SOURCE = "https://source.unsplash.com/960x640/?"
 
 _QUESTION_IMAGE_PATTERN = ("你是一个资深风趣的优质答主,"
-                           "帮我回答关于「{}」的问题,要求答案包含相关图片,字数在500到1000之间,图片要尽量和答案匹配,"
-                           "显示图片请用markdown语法 (" + _IMAGE_SOURCE + "<关键词>)")
+                           "帮我回答关于「{}」的问题,要求答案包含相关图片,字数在300到500之间,图片要尽量和答案匹配,"
+                           "显示图片请用markdown语法 (" + _IMAGE_SOURCE + "<英文关键词>)")
 _QUESTION_PATTERN = ("你是一个资深风趣的优质答主,"
-                     "帮我回答关于「{}」的问题,字数在500到1000之间")
+                     "帮我回答关于「{}」的问题,字数在300到500之间")
 _IMAGE_PATTERN = '<p><img src="{}" data_time="{}"/></p>'
 
 
@@ -47,7 +47,7 @@ class ChoiceApi(AbstractApi):
     task_types = [constant.kw.schedule]
     api_names = [
         "homepage",
-        "getqlist319"
+        # "getqlist319"
     ]
     active_api = None
 
@@ -114,7 +114,7 @@ class HomePageApi(AbstractApi):
     method = constant.hm.post_data
     api_types = ['question_baidu']
     task_types = [constant.kw.schedule]
-    tags = ["动漫", "电视剧", "单机游戏", "节日", "习俗", "装修"]
+    tags = ["动漫", "节日", "习俗", "生活常识", "单机游戏"]
 
     async def _before(self):
         self.data = {

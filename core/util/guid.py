@@ -15,3 +15,7 @@ def guid():
     """
     s = str(uuid.uuid4()).upper()
     return s[1: len(s)]
+
+
+def guid32():
+    return str(uuid.uuid1()).replace("-", "")

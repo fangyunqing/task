@@ -8,10 +8,10 @@ from __future__ import annotations
 __author__ = 'fyq'
 
 import asyncio
-from typing import Type, Dict, Any, List, Optional
+from typing import Type, Dict, Any, List, Optional, Generator
 
 import loguru
-from aiohttp import ClientSession, ClientResponseError
+from aiohttp import ClientSession, ClientResponseError, ClientConnectorError
 from munch import Munch
 
 from core import constant
@@ -165,11 +165,12 @@ class ScheduleTask(AbstractTask):
         while True:
             try:
                 await super().exec(session=session)
-            except ClientResponseError as e:
-                if e.status == 500:
-                    pass
-                else:
-                    raise e
+            except ClientResponseError:
+                pass
+            except ClientConnectorError:
+                pass
+            except asyncio.exceptions.TimeoutError:
+                pass
             finally:
                 await asyncio.sleep(self.repeat_time)
 
