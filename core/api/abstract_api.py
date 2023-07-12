@@ -34,25 +34,27 @@ class AbstractApi(Api):
         return False
 
     @abstractmethod
-    async def _before(self):
+    async def _before(self, session):
         """
             前置处理
+        :param session:
         :return:
         """
         pass
 
     @abstractmethod
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         """
             后置处理
             判断请求的成功或者失败
+        :param session:
         :param response:
         :return:
         """
 
     async def request(self, session: ClientSession) -> bool:
 
-        await self._before()
+        await self._before(session=session)
 
         if self.can_request:
             if self.method == hm.get:
@@ -76,7 +78,7 @@ class AbstractApi(Api):
                     raise ApiException(f"{self.api_sign}未设置方法")
 
             response.raise_for_status()
-            res = await self._after(response)
+            res = await self._after(response, session)
             response.close()
             if res:
                 self.task.info(f"{self.api_name} is success")
@@ -86,3 +88,23 @@ class AbstractApi(Api):
         else:
             return True
 
+
+class AbstractNodeApi(AbstractApi):
+
+    async def _before(self, session):
+        self.can_request = False
+        await self._ready_data()
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        pass
+
+    def success(self) -> Optional[InvokeInfo]:
+        return self._next()
+
+    @abstractmethod
+    async def _ready_data(self):
+        pass
+
+    @abstractmethod
+    def _next(self):
+        pass

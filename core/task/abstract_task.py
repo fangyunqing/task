@@ -8,17 +8,18 @@ from __future__ import annotations
 __author__ = 'fyq'
 
 import asyncio
-from typing import Type, Dict, Any, List, Optional, Generator
+import datetime
+from typing import Type, Dict, Any, List, Optional
 
 import loguru
-from aiohttp import ClientSession, ClientResponseError, ClientConnectorError
+from aiohttp import ClientSession
 from munch import Munch
 
 from core import constant
 from core.account import Account
-from core.task.task import Task
 from core.api import Api, InvokeInfo
-from core.exception import TaskException
+from core.exception import TaskException, ReLoginException
+from core.task.task import Task
 from core.util.user_agent import random_ua
 
 logins_cls_list: List[Type[LoginTask]] = []
@@ -145,9 +146,14 @@ class ScheduleTask(AbstractTask):
     # 登录task名称
     login_name: str
 
-    # 重复时间
-    # 单位秒
-    repeat_time: int = 150
+    # 重复时间 单位秒
+    repeat_time: int = 120
+
+    # 任务开始 小时
+    start_hour: int = None
+
+    # 任务不执行时间段 小时
+    non_execution: List[int] = None
 
     def __init__(self, opt: Optional[Munch]):
         super(ScheduleTask, self).__init__(opt)
@@ -164,13 +170,26 @@ class ScheduleTask(AbstractTask):
     async def exec(self, session: ClientSession):
         while True:
             try:
+                hour = datetime.datetime.now().hour
+                if self.start_hour:
+                    while True:
+                        if hour < self.start_hour:
+                            await asyncio.sleep(1800)
+                        else:
+                            break
+
+                if self.non_execution:
+                    while True:
+                        if hour in self.non_execution:
+                            await asyncio.sleep(1800)
+                        else:
+                            break
+
                 await super().exec(session=session)
-            except ClientResponseError:
-                pass
-            except ClientConnectorError:
-                pass
-            except asyncio.exceptions.TimeoutError:
-                pass
+            except ReLoginException as re:
+                raise re
+            except Exception as e:
+                self.exception(str(e))
             finally:
                 await asyncio.sleep(self.repeat_time)
 
@@ -225,12 +244,15 @@ class CombinationTask(Task):
         super(CombinationTask, self).__init__(opt)
         self._st_cls_list = st_cls_list
         self.login_name = login_name
+        self.config = Munch()
 
     def __repr__(self):
         return f"{self.login_name}-{[_.task_sign for _ in self._st_cls_list]}"
 
     async def exec(self, session: ClientSession):
-        tasks = {}
-        pe = []
-    # async def exec(self, ):
-    #     await asyncio.wait([_(self.opt).exec() for _ in self._st_cls_list])
+        tasks = [task_cls(self.opt) for task_cls in self._st_cls_list]
+        wait_tasks = []
+        for task in tasks:
+            task.config.login = self.config.login
+            wait_tasks.append(task.exec(session))
+        await asyncio.wait(wait_tasks)

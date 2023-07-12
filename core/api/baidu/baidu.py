@@ -16,7 +16,7 @@ from typing import Optional, List, Union
 from urllib import parse
 
 import aioconsole
-from aiohttp import ClientResponse
+from aiohttp import ClientResponse, ClientSession
 from munch import Munch
 
 from core import constant
@@ -31,6 +31,7 @@ from core.util.deep_learn import rot_net_captcha
 from core.util.format_response import format1
 from core.util.random import random_callback, jquery_random_call_back
 from core.util.time import thirteen_digits_time
+import pyparsing as pp
 
 _error = {
     "1": "您输入的帐号格式不正确",
@@ -51,10 +52,10 @@ class IndexApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    async def _before(self):
+    async def _before(self, session):
         self.config.client = client.random_client()
 
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         return True
 
 
@@ -68,7 +69,7 @@ class GetApiApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    async def _before(self):
+    async def _before(self, session):
         init_data = {
             "apiType": "login",
             "gid": self.config.gid,
@@ -85,7 +86,7 @@ class GetApiApi(AbstractApi):
         self.data = jsonp(params=params)
         self.data[constant.kw.callback] = random_callback("bd__cbs__??????")
 
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
         m = format1(text, self.data[constant.kw.callback])
         assert m is not None
@@ -99,7 +100,7 @@ class GetPublicKeyApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    async def _before(self):
+    async def _before(self, session):
         init_data = {
             "gid": self.config.gid,
             "loginVersion": "v5",
@@ -116,7 +117,7 @@ class GetPublicKeyApi(AbstractApi):
         self.data = jsonp(params=params)
         self.data[constant.kw.callback] = random_callback("bd__cbs__??????")
 
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
         m = format1(text, self.data[constant.kw.callback])
         assert m is not None
@@ -132,7 +133,7 @@ class ViewLogApi(AbstractApi):
     task_types = [constant.kw.login]
     op = None
 
-    async def _before(self):
+    async def _before(self, session):
         self.data = {}
         if self.config.store["nameL"]:
             if self.invoke_config.setdefault("image_verify", False):
@@ -312,7 +313,7 @@ class ViewLogApi(AbstractApi):
         self.data["ak"] = self.config.store.get("ak", None)
         self.data["_"] = thirteen_digits_time()
 
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
         m = format1(text, self.data[constant.kw.callback])
         assert m is not None
@@ -340,7 +341,7 @@ class LoginApi(AbstractApi):
     task_types = [constant.kw.login]
     err_no = None
 
-    async def _before(self):
+    async def _before(self, session):
         init_data = {
             "token": self.config.token,
             "subpro": "",
@@ -388,7 +389,7 @@ class LoginApi(AbstractApi):
                           trace_id=True)
         self.data[constant.kw.callback] = "parent." + random_callback("bd__pcbs__??????")
 
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
         p = re.compile(r'.+(?<=href \+=)\s*"(.+)"')
         r = p.findall(text)
@@ -426,7 +427,7 @@ class GetStyleApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    async def _before(self):
+    async def _before(self, session):
         self.data = {
             "ak": self.config.store.get("ak", None),
             "tk": self.config.store.get("tk", None),
@@ -437,7 +438,7 @@ class GetStyleApi(AbstractApi):
             "callback": jquery_random_call_back()
         }
 
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
         m = format1(text, self.data[constant.kw.callback])
         assert m is not None
@@ -457,10 +458,10 @@ class VerifyImageApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    async def _before(self):
+    async def _before(self, session):
         self.url = self.config.verify_image["url"]
 
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         image_path = f"{self.task.opt.image_path}{os.sep}{str(uuid.uuid4())}.jpg"
         with open(image_path, 'wb') as fp:
             fp.write(await response.read())
@@ -478,12 +479,12 @@ class LoginInfoApi(AbstractApi):
     task_types = [constant.kw.login]
     is_login: int
 
-    async def _before(self):
+    async def _before(self, session):
         self.data = {
             "t": thirteen_digits_time()
         }
 
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.read()
         try:
             text_json = json.loads(text)
@@ -502,6 +503,77 @@ class LoginInfoApi(AbstractApi):
     def fail(self) -> Optional[InvokeInfo]:
         return InvokeInfo("getapi")
 
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("baijiahao")
+
+
+class BaiJiaHaoApi(AbstractApi):
+    url = "https://baijiahao.baidu.com/"
+    method = constant.hm.get
+    api_types = ['baidu']
+    task_types = [constant.kw.login]
+    response_url = None
+
+    async def _before(self, session):
+        pass
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        self.response_url = str(response.url)
+        if "fe-react" in self.response_url:
+            return False
+        else:
+            text = await response.text()
+            token_word = (pp.Suppress('window.__BJH__INIT__AUTH__="') +
+                          pp.Word(pp.alphanums + "._-*=") +
+                          pp.Suppress('"'))
+            token_list = list(token_word.scan_string(text))
+            assert len(token_list) == 1
+            token, s, e = token_list[0]
+            session.headers["token"] = token[0]
+            return True
+
+    def fail(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("baijiahaoauth", Munch({"response_url": self.response_url}))
+
+
+class BaiJiaHaoAuthApi(AbstractApi):
+    url = "https://passport.baidu.com/v3/login/api/auth/"
+    method = constant.hm.get
+    api_types = ['baidu']
+    task_types = [constant.kw.login]
+
+    async def _before(self, session: ClientSession):
+        self.data = {
+            constant.kw.callback: f"json_callback_{thirteen_digits_time()}",
+            "return_type": 2,
+            "tpl": "bjh"
+        }
+        session.headers["Referer"] = "https://baijiahao.baidu.com/"
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        m = format1(text, self.data[constant.kw.callback])
+        assert m is not None and m.errno == 0
+        self.invoke_config["stoken"] = m.stoken
+        return True
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("dealtoken", self.invoke_config)
+
+
+class DealTokenApi(AbstractApi):
+    url = "https://baijiahao.baidu.com/pcui/home/dealtoken"
+    method = constant.hm.get
+    api_types = ['baidu']
+    task_types = [constant.kw.login]
+
+    async def _before(self, session: ClientSession):
+        session.headers["Referer"] = self.invoke_config.response_url
+        session.headers["bjh"] = self.invoke_config.stoken
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        return True
+
 
 class LoginCheckApi(AbstractApi):
     url = "https://passport.baidu.com/v2/api/?logincheck"
@@ -509,7 +581,7 @@ class LoginCheckApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    async def _before(self):
+    async def _before(self, session):
         init_data = {
             "token": self.config.token,
             "sub_source": "leadsetpwd",
@@ -531,7 +603,7 @@ class LoginCheckApi(AbstractApi):
                           trace_id=True)
         self.data[constant.kw.callback] = random_callback("bd__cbs__??????")
 
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         return True
 
     def success(self) -> Optional[InvokeInfo]:
@@ -547,7 +619,7 @@ class AuthWidgetVerifyApi(AbstractApi):
     api_types = ['baidu']
     task_types = [constant.kw.login]
 
-    async def _before(self):
+    async def _before(self, session):
         action = self.invoke_config.setdefault("action", "send")
 
         self.data = {
@@ -577,7 +649,7 @@ class AuthWidgetVerifyApi(AbstractApi):
             self.data["secret"] = ""
             self.data["vcode"] = await aioconsole.ainput('请输入验证码:')
 
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
         m = format1(text, self.data[constant.kw.callback])
         assert m is not None

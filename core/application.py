@@ -25,6 +25,14 @@ class Application:
 
     def __init__(self):
 
+        logger.add("log/task_{time:YYYY-MM-DD}.log",
+                   format="{time:YYYY-MM-DD at HH:mm:ss:SSS} | {level} "
+                          "| {module}:{function}:{line}  | {message}",
+                   mode='a+',
+                   encoding='utf-8',
+                   backtrace=True,
+                   diagnose=True)
+
         for module in modules:
             try:
                 importlib.import_module(module)

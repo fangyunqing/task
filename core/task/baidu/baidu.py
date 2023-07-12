@@ -5,10 +5,6 @@
 
 __author__ = 'fyq'
 
-import asyncio
-import datetime
-
-from aiohttp import ClientSession
 from munch import Munch
 
 from core.task.abstract_task import LoginTask, ScheduleTask
@@ -60,15 +56,6 @@ class BaiduLogin(LoginTask):
 
 class QuestionScheduleTask(ScheduleTask):
 
-    async def exec(self, session: ClientSession):
-        while True:
-            h = datetime.datetime.now().hour
-            if h in list(range(2, 6)):
-                await asyncio.sleep(1800)
-            else:
-                break
-        await super().exec(session)
-
     first_api_name = "choice"
 
     api_types = ["question_baidu"]
@@ -80,3 +67,20 @@ class QuestionScheduleTask(ScheduleTask):
         "like": True,
         "comment": True
     })
+
+    repeat_time = 90
+
+
+class ArticleScheduleTask(ScheduleTask):
+
+    first_api_name = "article"
+
+    api_types = ["article_baidu"]
+
+    login_name = "baidu"
+
+    config = Munch()
+
+    start_hour = 9
+
+    repeat_time = 600

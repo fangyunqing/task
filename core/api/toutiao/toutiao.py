@@ -24,10 +24,10 @@ class IndexApi(AbstractApi):
     api_types = ['toutiao']
     task_types = [constant.kw.login]
 
-    async def _before(self):
+    async def _before(self, session):
         pass
 
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         pass
 
 
@@ -38,7 +38,7 @@ class SendActivationCodeApi(AbstractApi):
     task_types = [constant.kw.login]
     error_code = 0
 
-    async def _before(self):
+    async def _before(self, session):
         self.url = _PARAMS
         self.data = util2.algorithm1(
             d1={
@@ -52,7 +52,7 @@ class SendActivationCodeApi(AbstractApi):
             ]
         )
 
-    async def _after(self, response: ClientResponse) -> bool:
+    async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
         text_json = json.loads(text)
         self.error_code = text_json["error_code"]
