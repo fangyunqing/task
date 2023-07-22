@@ -28,9 +28,11 @@ class Application:
         logger.add("log/task_{time:YYYY-MM-DD}.log",
                    format="{time:YYYY-MM-DD at HH:mm:ss:SSS} | {level} "
                           "| {module}:{function}:{line}  | {message}",
-                   mode='a+',
                    encoding='utf-8',
                    backtrace=True,
+                   rotation="00:00:00",
+                   retention="5 days",
+                   compression="zip",
                    diagnose=True)
 
         for module in modules:

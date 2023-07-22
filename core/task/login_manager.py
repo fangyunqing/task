@@ -52,10 +52,10 @@ class LoginManager:
         return cookie_jar
 
     async def save_ua(self, name: str, session: aiohttp.ClientSession):
-        if constant.kw.ua in session.headers:
+        if constant.kw.UA in session.headers:
             file_path = f"{self._opt.ua_path}{os.sep}{name}.ua"
             async with aiofiles.open(file_path, mode='w') as f:
-                await f.write(session.headers[constant.kw.ua])
+                await f.write(session.headers[constant.kw.UA])
 
     async def load_ua(self, name: str):
         file_path = f"{self._opt.ua_path}{os.sep}{name}.ua"
@@ -71,7 +71,7 @@ class LoginManager:
         ua = await self.load_ua(login_name)
         headers = login_task.headers
         if ua:
-            headers[constant.kw.ua] = ua
+            headers[constant.kw.UA] = ua
         async with aiohttp.ClientSession(headers=login_task.headers,
                                          trace_configs=self.create_trace_config(),
                                          connector=aiohttp.TCPConnector(ssl=False),

@@ -65,10 +65,13 @@ class QuestionScheduleTask(ScheduleTask):
     config = Munch({
         "task_sign": True,
         "like": True,
-        "comment": True
+        "comment": True,
+        "approval_treasure": True
     })
 
-    repeat_time = 90
+    repeat_time = 180
+
+    non_execution = range(2, 6)
 
 
 class ArticleScheduleTask(ScheduleTask):
@@ -81,6 +84,16 @@ class ArticleScheduleTask(ScheduleTask):
 
     config = Munch()
 
-    start_hour = 9
+    start_hour = 6
 
-    repeat_time = 600
+    repeat_time = 180
+
+
+class AskScheduleTask(ScheduleTask):
+
+    api_types = ["ask_baidu"]
+
+    login_name = "baidu"
+
+    config = Munch()
+

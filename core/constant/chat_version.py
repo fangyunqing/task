@@ -5,11 +5,11 @@
 
 __author__ = 'fyq'
 
-chat_3d5 = "gpt-3.5-turbo"
+CHAT_3D5 = "gpt-3.5-turbo"
 
-chat_3d5_0613 = "gpt-3.5-turbo-0613"
+CHAT_3D5_0613 = "gpt-3.5-turbo-0613"
 
-chat_3d5_16k = "gpt-3.5-turbo-16k"
+CHAT_3D5_16K = "gpt-3.5-turbo-16k"
 
-chat_4 = "gpt-4"
+CHAT_4 = "gpt-4"
 

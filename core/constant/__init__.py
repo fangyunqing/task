@@ -8,3 +8,4 @@ __author__ = 'fyq'
 import core.constant.key_word as kw
 import core.constant.http_method as hm
 from core.constant import chat_version
+from core.constant import error

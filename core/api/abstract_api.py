@@ -57,19 +57,19 @@ class AbstractApi(Api):
         await self._before(session=session)
 
         if self.can_request:
-            if self.method == hm.get:
+            if self.method == hm.GET:
                 response = await session.get(self.url, params=self.data, proxy=self.task.opt.proxy)
-            elif self.method == hm.post_data:
+            elif self.method == hm.POST_DATA:
                 response = await session.post(self.url, data=self.data, proxy=self.task.opt.proxy)
-            elif self.method == hm.post_json:
+            elif self.method == hm.POST_JSON:
                 response = await session.post(self.url, json=self.data, proxy=self.task.opt.proxy)
-            elif self.method == hm.delete:
+            elif self.method == hm.DELETE:
                 response = await session.delete(self.url, proxy=self.task.opt.proxy)
-            elif self.method == hm.head:
+            elif self.method == hm.HEAD:
                 response = await session.head(self.url, proxy=self.task.opt.proxy)
-            elif self.method == hm.options:
+            elif self.method == hm.OPTIONS:
                 response = await session.options(self.url, proxy=self.task.opt.proxy)
-            elif self.method == hm.put:
+            elif self.method == hm.PUT:
                 response = await session.put(self.url, data=self.data, proxy=self.task.opt.proxy)
             else:
                 if self.method:

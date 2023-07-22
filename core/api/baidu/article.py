@@ -110,18 +110,13 @@ class ImageCut:
 
 class ArticleApi(AbstractNodeApi):
     api_types = ['article_baidu']
-    task_types = [constant.kw.schedule]
+    task_types = [constant.kw.SCHEDULE]
     kind = [
-        ["历史", "中国古代史"],
-        ["历史", "中国近代史"],
-        ["历史", "世界历史"],
         ["情感", "心灵鸡汤"],
         ["情感", "人际关系"],
         ["情感", "两性"],
-        ["生活", "生活技巧"],
-        ["健康养生", "健康常识"],
-        ["三农", "农村风俗"],
         ["医美", "知识科普"],
+        ["医美", "医美综合"],
     ]
 
     async def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
@@ -134,8 +129,8 @@ class ArticleApi(AbstractNodeApi):
         self.config.record = record.get_record(Munch({"kind": "baidu", "name": "article", "date": get_date()}))
 
         self.config.kind = random.choice(self.kind)
-        topics = await invoke_3d5_turbo("帮我列举几个关于{}的话题，要求每个话题长度大于8。"
-                                        "答案只包含[topics]的json格式".format("-".join(self.config.kind)),
+        topics = await invoke_3d5_turbo("帮我列举几个关于[{}]的话题，要求每个话题长度大于8。"
+                                        "回复只包含[topics]的json格式".format("-".join(self.config.kind)),
                                         log=self.task.info)
         if topics:
             topic_dict = json.loads(topics.a)
@@ -146,19 +141,29 @@ class ArticleApi(AbstractNodeApi):
                 if len(topics) > 0:
                     await asyncio.sleep(60)
                     title = random.choice(topics)
-                    data = await invoke_3d5_turbo('创作一篇关于{}的文章，文章不包含任何网址，能够通过 AI 内容检测工具检测；'
-                                                  '文章包含标题、小标题、图片，'
-                                                  '显示标题用<标题：关键字>；'
-                                                  '显示小标题用<小标题：关键字>，小标题无序；'
-                                                  '显示图片用<图片：关键字>，图片无序。'.format(title),
+                    data = await invoke_3d5_turbo('创作一篇主题为[{}]的文章，文章不包含任何网址，能够通过AI内容检测工具检测；'
+                                                  '文章包含标题、小标题、图片，使用不同于主题的标题；'
+                                                  '显示标题用<标题：中文关键字>；'
+                                                  '显示小标题用<小标题：中文关键字>，小标题无序；'
+                                                  '显示图片用<图片：中文关键字>，图片无序。'.format(title),
                                                   log=self.task.info)
                     if data and '小标题1' not in data.a and '图片1' not in data.a and data.a.startswith("<标题："):
                         self.config.article.title = title
-                        title_tag = pp.Suppress("<标题：") + pp.Word(
-                            pp.pyparsing_unicode.alphanums + pp.alphanums) + pp.Suppress(">")
-                        little_title_tag = pp.Suppress("<小标题：") + pp.Word(pp.pyparsing_unicode.alphanums) + pp.Suppress(
-                            ">")
-                        image_tag = pp.Suppress("<图片：") + pp.Word(pp.pyparsing_unicode.alphanums) + pp.Suppress(">")
+                        title_tag = (
+                                pp.Suppress("<标题：") +
+                                pp.Word(pp.pyparsing_unicode.alphanums + pp.alphanums + '''、：:，,!！.。;；：:'‘“"?？《》''') +
+                                pp.Suppress(">")
+                                     )
+                        little_title_tag = (
+                                pp.Suppress("<小标题：") +
+                                pp.Word(pp.pyparsing_unicode.alphanums + pp.alphanums + '''、：:，,!！.。;；：:'‘“"?？《》''') +
+                                pp.Suppress(">")
+                        )
+                        image_tag = (
+                                pp.Suppress("<图片：") +
+                                pp.Word(pp.pyparsing_unicode.alphanums + pp.alphanums + '''、：:，,!！.。;；：:'‘“"?？《》''') +
+                                pp.Suppress(">")
+                        )
                         data_lines: List[Any] = data.a.split('\n')
                         for line_idx, data_line in enumerate(data_lines.copy()):
                             for ps, s, e in title_tag.scan_string(data_line):
@@ -168,7 +173,7 @@ class ArticleApi(AbstractNodeApi):
                             for ps, s, e in image_tag.scan_string(data_line):
                                 data_lines[line_idx] = ArticleImage()
                                 self.config.article.setdefault("images", {})["".join(ps)] = data_lines[line_idx]
-                        data_lines.pop(0)
+                        self.config.article.title = data_lines.pop(0)
                         while len(data_lines) > 0:
                             if data_lines[0] == 0:
                                 data_lines.pop(0)
@@ -188,9 +193,9 @@ class ArticleApi(AbstractNodeApi):
 
 class ArticleEditApi(AbstractApi):
     url = "https://baijiahao.baidu.com/pcui/article/edit"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['article_baidu']
-    task_types = [constant.kw.schedule]
+    task_types = [constant.kw.SCHEDULE]
 
     async def _before(self, session):
         self.data = {
@@ -211,15 +216,15 @@ class ArticleEditApi(AbstractApi):
 
 class PictureSearchApi(AbstractApi):
     url = "https://baijiahao.baidu.com/aigc/bjh/pc/v1/picSearch"
-    method = constant.hm.post_data
+    method = constant.hm.POST_DATA
     api_types = ['article_baidu']
-    task_types = [constant.kw.schedule]
+    task_types = [constant.kw.SCHEDULE]
 
     async def _before(self, session):
         self.data = {
             "keyword": self.invoke_config.keyword,
             "page_no": 0,
-            "page_size": 3,
+            "page_size": 20,
             "label": "superior"
         }
 
@@ -253,9 +258,9 @@ class PictureSearchApi(AbstractApi):
 
 class SaveArticleApi(AbstractApi):
     url = "https://baijiahao.baidu.com/pcui/article/save?callback=bjhpreview"
-    method = constant.hm.post_data
+    method = constant.hm.POST_DATA
     api_types = ['article_baidu']
-    task_types = [constant.kw.schedule]
+    task_types = [constant.kw.SCHEDULE]
 
     async def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
         self.config.article.cover = []
@@ -349,9 +354,9 @@ class SaveArticleApi(AbstractApi):
 
 class CutPictureApi(AbstractApi):
     url = "https://baijiahao.baidu.com/pcui/Picture/CuttingPic"
-    method = constant.hm.post_data
+    method = constant.hm.POST_DATA
     api_types = ['article_baidu']
-    task_types = [constant.kw.schedule]
+    task_types = [constant.kw.SCHEDULE]
     image_cut = None
 
     async def _before(self, session):
@@ -397,9 +402,9 @@ class CutPictureApi(AbstractApi):
 
 class TaskSystemApi(AbstractApi):
     url = "https://baijiahao.baidu.com/author/eco/tasksystem/getSquareMissionList"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['article_baidu']
-    task_types = [constant.kw.schedule]
+    task_types = [constant.kw.SCHEDULE]
 
     async def _before(self, session):
         self.data = {
@@ -426,9 +431,9 @@ class TaskSystemApi(AbstractApi):
 
 class PublishArticleApi(AbstractApi):
     url = "https://baijiahao.baidu.com/pcui/article/publish?callback=bjhpublish"
-    method = constant.hm.post_data
+    method = constant.hm.POST_DATA
     api_types = ['article_baidu']
-    task_types = [constant.kw.schedule]
+    task_types = [constant.kw.SCHEDULE]
 
     async def _before(self, session):
         activity_dict = {}

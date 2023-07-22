@@ -163,24 +163,23 @@ class ScheduleTask(AbstractTask):
         return super().__new__(cls, *args, **kwargs)
 
     def __init_subclass__(cls, **kwargs):
-        cls.task_type = constant.kw.schedule
+        cls.task_type = constant.kw.SCHEDULE
         cls.task_name = cls.__name__.replace(cls.task_type.title(), "").lower()
         schedule_cls_list.append(cls)
 
     async def exec(self, session: ClientSession):
         while True:
             try:
-                hour = datetime.datetime.now().hour
                 if self.start_hour:
                     while True:
-                        if hour < self.start_hour:
+                        if datetime.datetime.now().hour < self.start_hour:
                             await asyncio.sleep(1800)
                         else:
                             break
 
                 if self.non_execution:
                     while True:
-                        if hour in self.non_execution:
+                        if datetime.datetime.now().hour in self.non_execution:
                             await asyncio.sleep(1800)
                         else:
                             break
@@ -215,14 +214,14 @@ class LoginTask(AbstractTask):
         return super().__new__(cls, *args, **kwargs)
 
     def __init_subclass__(cls, **kwargs):
-        cls.task_type = constant.kw.login
+        cls.task_type = constant.kw.LOGIN
         cls.task_name = cls.__name__.replace(cls.task_type.title(), "").lower()
         logins_cls_list.append(cls)
 
     @property
     def headers(self) -> Dict[str, Any]:
         headers = {
-            constant.kw.ua: random_ua()
+            constant.kw.UA: random_ua()
         }
 
         if self.referer:
@@ -256,3 +255,4 @@ class CombinationTask(Task):
             task.config.login = self.config.login
             wait_tasks.append(task.exec(session))
         await asyncio.wait(wait_tasks)
+

@@ -14,6 +14,7 @@ default_opt = {
     "response_len": 10240,
     "image_path": f"image",
     "model_path": f"model",
+    "template_path": "template",
     "sleep_time": 2,
     "cookies_path": f"core{os.sep}cookies",
     "ua_path": f"core{os.sep}ua"

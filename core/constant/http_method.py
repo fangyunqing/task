@@ -5,18 +5,18 @@
 
 __author__ = 'fyq'
 
-get = "get"
+GET = "get"
 
-post_data = "post_data"
+POST_DATA = "post_data"
 
-post_json = "post_json"
+POST_JSON = "post_json"
 
-put = "put"
+PUT = "put"
 
-delete = "delete"
+DELETE = "delete"
 
-head = "head"
+HEAD = "head"
 
-options = "options"
+OPTIONS = "options"
 
-patch = "patch"
+PATCH = "patch"

@@ -20,9 +20,9 @@ _PARAMS = "aid=24&account_sdk_source=sso&language=zh"
 
 class IndexApi(AbstractApi):
     url = "https://sso.toutiao.com/"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['toutiao']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
 
     async def _before(self, session):
         pass
@@ -33,9 +33,9 @@ class IndexApi(AbstractApi):
 
 class SendActivationCodeApi(AbstractApi):
     url = "https://sso.toutiao.com/send_activation_code/v2/"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['toutiao']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
     error_code = 0
 
     async def _before(self, session):

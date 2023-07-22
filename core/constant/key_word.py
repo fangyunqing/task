@@ -5,16 +5,16 @@
 
 __author__ = 'fyq'
 
-abstract = "Abstract"
+ABSTRACT = "Abstract"
 
-login = "login"
+LOGIN = "login"
 
-schedule = "schedule"
+SCHEDULE = "schedule"
 
-api = "api"
+API = "api"
 
-callback = "callback"
+CALLBACK = "callback"
 
-ua = "User-Agent"
+UA = "User-Agent"
 
-
+MISSING = "missing"

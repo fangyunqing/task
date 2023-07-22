@@ -48,9 +48,9 @@ _error = {
 
 class IndexApi(AbstractApi):
     url = "https://www.baidu.com"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
 
     async def _before(self, session):
         self.config.client = client.random_client()
@@ -65,9 +65,9 @@ class GetApiApi(AbstractApi):
         return InvokeInfo("logincheck")
 
     url = "https://passport.baidu.com/v2/api/?getapi"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
 
     async def _before(self, session):
         init_data = {
@@ -84,11 +84,11 @@ class GetApiApi(AbstractApi):
                                   static=False)
 
         self.data = jsonp(params=params)
-        self.data[constant.kw.callback] = random_callback("bd__cbs__??????")
+        self.data[constant.kw.CALLBACK] = random_callback("bd__cbs__??????")
 
     async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
-        m = format1(text, self.data[constant.kw.callback])
+        m = format1(text, self.data[constant.kw.CALLBACK])
         assert m is not None
         self.config.token = m.data.get("token")
         return True
@@ -96,9 +96,9 @@ class GetApiApi(AbstractApi):
 
 class GetPublicKeyApi(AbstractApi):
     url = "https://passport.baidu.com/v2/getpublickey"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
 
     async def _before(self, session):
         init_data = {
@@ -115,11 +115,11 @@ class GetPublicKeyApi(AbstractApi):
                                   static=False)
 
         self.data = jsonp(params=params)
-        self.data[constant.kw.callback] = random_callback("bd__cbs__??????")
+        self.data[constant.kw.CALLBACK] = random_callback("bd__cbs__??????")
 
     async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
-        m = format1(text, self.data[constant.kw.callback])
+        m = format1(text, self.data[constant.kw.CALLBACK])
         assert m is not None
         self.config.pubkey = m.get("pubkey", None)
         self.config.key = m.get("key", None)
@@ -128,9 +128,9 @@ class GetPublicKeyApi(AbstractApi):
 
 class ViewLogApi(AbstractApi):
     url = "https://passport.baidu.com/viewlog"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
     op = None
 
     async def _before(self, session):
@@ -309,13 +309,13 @@ class ViewLogApi(AbstractApi):
             self.data["as"] = self.config.store.get("nameL", None)
             self.data["tk"] = self.config.store.get("tk", None)
 
-        self.data[constant.kw.callback] = jquery_random_call_back()
+        self.data[constant.kw.CALLBACK] = jquery_random_call_back()
         self.data["ak"] = self.config.store.get("ak", None)
         self.data["_"] = thirteen_digits_time()
 
     async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
-        m = format1(text, self.data[constant.kw.callback])
+        m = format1(text, self.data[constant.kw.CALLBACK])
         assert m is not None
         self.config.store["ds"] = m.data.get("ds", "")
         self.config.store["as"] = m.data.get("as", "")
@@ -336,9 +336,9 @@ class ViewLogApi(AbstractApi):
 
 class LoginApi(AbstractApi):
     url = "https://passport.baidu.com/v2/api/?login"
-    method = constant.hm.post_data
+    method = constant.hm.POST_DATA
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
     err_no = None
 
     async def _before(self, session):
@@ -387,7 +387,7 @@ class LoginApi(AbstractApi):
         self.data = jsonp(params=params,
                           fuid=init_data["fuid"],
                           trace_id=True)
-        self.data[constant.kw.callback] = "parent." + random_callback("bd__pcbs__??????")
+        self.data[constant.kw.CALLBACK] = "parent." + random_callback("bd__pcbs__??????")
 
     async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
@@ -423,9 +423,9 @@ class LoginApi(AbstractApi):
 
 class GetStyleApi(AbstractApi):
     url = "https://passport.baidu.com/viewlog/getstyle"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
 
     async def _before(self, session):
         self.data = {
@@ -440,7 +440,7 @@ class GetStyleApi(AbstractApi):
 
     async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
-        m = format1(text, self.data[constant.kw.callback])
+        m = format1(text, self.data[constant.kw.CALLBACK])
         assert m is not None
         self.config.verify_image = {
             "url": parse.unquote(m.data["ext"]["img"]),
@@ -454,9 +454,9 @@ class GetStyleApi(AbstractApi):
 
 class VerifyImageApi(AbstractApi):
     url = None
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
 
     async def _before(self, session):
         self.url = self.config.verify_image["url"]
@@ -474,9 +474,9 @@ class VerifyImageApi(AbstractApi):
 
 class LoginInfoApi(AbstractApi):
     url = "https://zhidao.baidu.com/api/loginInfo"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
     is_login: int
 
     async def _before(self, session):
@@ -509,9 +509,9 @@ class LoginInfoApi(AbstractApi):
 
 class BaiJiaHaoApi(AbstractApi):
     url = "https://baijiahao.baidu.com/"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
     response_url = None
 
     async def _before(self, session):
@@ -535,16 +535,19 @@ class BaiJiaHaoApi(AbstractApi):
     def fail(self) -> Optional[InvokeInfo]:
         return InvokeInfo("baijiahaoauth", Munch({"response_url": self.response_url}))
 
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("wenuserdata")
+
 
 class BaiJiaHaoAuthApi(AbstractApi):
     url = "https://passport.baidu.com/v3/login/api/auth/"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
 
     async def _before(self, session: ClientSession):
         self.data = {
-            constant.kw.callback: f"json_callback_{thirteen_digits_time()}",
+            constant.kw.CALLBACK: f"json_callback_{thirteen_digits_time()}",
             "return_type": 2,
             "tpl": "bjh"
         }
@@ -552,7 +555,7 @@ class BaiJiaHaoAuthApi(AbstractApi):
 
     async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
-        m = format1(text, self.data[constant.kw.callback])
+        m = format1(text, self.data[constant.kw.CALLBACK])
         assert m is not None and m.errno == 0
         self.invoke_config["stoken"] = m.stoken
         return True
@@ -563,9 +566,9 @@ class BaiJiaHaoAuthApi(AbstractApi):
 
 class DealTokenApi(AbstractApi):
     url = "https://baijiahao.baidu.com/pcui/home/dealtoken"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
 
     async def _before(self, session: ClientSession):
         session.headers["Referer"] = self.invoke_config.response_url
@@ -577,9 +580,9 @@ class DealTokenApi(AbstractApi):
 
 class LoginCheckApi(AbstractApi):
     url = "https://passport.baidu.com/v2/api/?logincheck"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
 
     async def _before(self, session):
         init_data = {
@@ -601,7 +604,7 @@ class LoginCheckApi(AbstractApi):
         self.data = jsonp(params=params,
                           fuid=util6.fuid(self.config),
                           trace_id=True)
-        self.data[constant.kw.callback] = random_callback("bd__cbs__??????")
+        self.data[constant.kw.CALLBACK] = random_callback("bd__cbs__??????")
 
     async def _after(self, response: ClientResponse, session) -> bool:
         return True
@@ -615,9 +618,9 @@ class LoginCheckApi(AbstractApi):
 
 class AuthWidgetVerifyApi(AbstractApi):
     url = "https://passport.baidu.com/v2/sapi/authwidgetverify"
-    method = constant.hm.get
+    method = constant.hm.GET
     api_types = ['baidu']
-    task_types = [constant.kw.login]
+    task_types = [constant.kw.LOGIN]
 
     async def _before(self, session):
         action = self.invoke_config.setdefault("action", "send")
@@ -627,7 +630,7 @@ class AuthWidgetVerifyApi(AbstractApi):
             "apiver": "v3",
             "authAction": "",
             "authtoken": self.config.login_response["authtoken"],
-            constant.kw.callback: random_callback("bd__pcbs__??????"),
+            constant.kw.CALLBACK: random_callback("bd__pcbs__??????"),
             "countrycode": "",
             "jsonp": 1,
             "lstr": self.config.login_response["lstr"],
@@ -651,7 +654,7 @@ class AuthWidgetVerifyApi(AbstractApi):
 
     async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
-        m = format1(text, self.data[constant.kw.callback])
+        m = format1(text, self.data[constant.kw.CALLBACK])
         assert m is not None
         if m.errno == "110000":
             return True
@@ -670,3 +673,23 @@ class AuthWidgetVerifyApi(AbstractApi):
             pass
         else:
             return InvokeInfo("authwidgetverify", Munch({"action": "send"}))
+
+
+class WenUserDataApi(AbstractApi):
+    url = "https://wen.baidu.com/consult/userdata"
+    method = constant.hm.GET
+    api_types = ['baidu']
+    task_types = [constant.kw.LOGIN]
+
+    async def _before(self, session):
+        pass
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json[constant.error.ERRNO] == 0:
+            self.config.login["wen"] = text_json["data"]
+            return True
+        else:
+            self.task.error(text_json[constant.error.ERRMSG])
+            return False

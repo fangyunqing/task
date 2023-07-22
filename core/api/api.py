@@ -81,8 +81,8 @@ class Api(ABC):
         return f"{self.api_sign}:{self.method} {self.url}"
 
     def __init_subclass__(cls, **kwargs):
-        cls.api_name = cls.__name__.replace(constant.kw.api.title(), "", 1).lower()
-        if constant.kw.abstract.lower() not in cls.api_name:
+        cls.api_name = cls.__name__.replace(constant.kw.API.title(), "", 1).lower()
+        if constant.kw.ABSTRACT.lower() not in cls.api_name:
             api_cls_list.append(cls)
 
     @abstractmethod
