@@ -32,7 +32,6 @@ class Application:
                    backtrace=True,
                    rotation="00:00:00",
                    retention="5 days",
-                   compression="zip",
                    diagnose=True)
 
         for module in modules:

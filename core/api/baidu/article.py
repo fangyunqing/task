@@ -6,6 +6,8 @@
 __author__ = 'fyq'
 
 import asyncio
+import base64
+import glob
 import json
 import os
 import random
@@ -23,6 +25,7 @@ from core import constant, record
 from core.api import InvokeInfo
 from core.api.abstract_api import AbstractApi, AbstractNodeApi
 from core.chatgpt import invoke_3d5_turbo
+from core.util.cut import cut_rect
 from core.util.guid import guid32
 import pyparsing as pp
 from PIL import Image
@@ -120,13 +123,23 @@ class ArticleApi(AbstractNodeApi):
     ]
 
     async def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
-        return InvokeInfo("articleedit")
+        self.config.record = record.get_record(
+            kind="baidu",
+            name="article",
+            date=get_date(),
+            params=Munch({"generate": True, "publish": True}))
+        if self.config.record.params.publish:
+            return InvokeInfo("articleedit")
 
     async def _ready_data(self):
+
+        for file in glob.glob(f"{self.task.opt.image_path}{os.sep}article{os.sep}*"):
+            os.remove(file)
+
         self.config.article = Munch()
-        if not self.config.can_article:
+
+        if not self.config.record.params.publish:
             return
-        self.config.record = record.get_record(Munch({"kind": "baidu", "name": "article", "date": get_date()}))
 
         self.config.kind = random.choice(self.kind)
         topics = await invoke_3d5_turbo("帮我列举几个关于[{}]的话题，要求每个话题长度大于8。"
@@ -153,7 +166,7 @@ class ArticleApi(AbstractNodeApi):
                                 pp.Suppress("<标题：") +
                                 pp.Word(pp.pyparsing_unicode.alphanums + pp.alphanums + '''、：:，,!！.。;；：:'‘“"?？《》''') +
                                 pp.Suppress(">")
-                                     )
+                        )
                         little_title_tag = (
                                 pp.Suppress("<小标题：") +
                                 pp.Word(pp.pyparsing_unicode.alphanums + pp.alphanums + '''、：:，,!！.。;；：:'‘“"?？《》''') +
@@ -182,8 +195,10 @@ class ArticleApi(AbstractNodeApi):
                         self.config.article.content_lines = data_lines
 
     def _next(self):
-        if self.config.article:
+        if self.config.record.params.publish:
             return InvokeInfo("savearticle")
+        elif self.config.record.params.generate:
+            return InvokeInfo("articlelist")
 
     async def post(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
         if self.config.article:
@@ -206,11 +221,11 @@ class ArticleEditApi(AbstractApi):
         text = await response.text()
         text_json = json.loads(text)
         if text_json["errno"] == 0:
-            self.config.can_article = (text_json["data"]["ability"]["publish_num_left"] > 0)
+            self.config.record.params.publish = (text_json["data"]["ability"]["publish_num_left"] > 0)
+            record.update_record(self.config.record)
             return True
         else:
             self.task.error(text_json["errmsg"])
-            self.config.can_article = False
             return False
 
 
@@ -342,8 +357,6 @@ class SaveArticleApi(AbstractApi):
         text_json = json.loads(text)
         if text_json["errno"] == 0:
             self.config.article.ret = text_json["ret"]
-            self.config.record.num += 1
-            record.update_record(self.config.record)
             return True
         else:
             return False
@@ -471,4 +484,481 @@ class PublishArticleApi(AbstractApi):
         self.data.update(activity_dict)
 
     async def _after(self, response: ClientResponse, session) -> bool:
-        pass
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json["errno"] == 0:
+            self.config.record.num += 1
+            self.config.record.memo.setdefault("article_list", []).append({
+                "id": text_json["ret"]["nid"],
+                "video": False
+            })
+            record.update_record(self.config.record)
+            return True
+        else:
+            return False
+
+    def success(self) -> Optional[InvokeInfo]:
+        if self.config.record.params.generate:
+            return InvokeInfo("articlelist")
+        else:
+            return InvokeInfo("ttvlist")
+
+
+class ArticleListApi(AbstractApi):
+    url = "https://aigc.baidu.com/aigc/saas/pc/v1/assist/getArticleList"
+    method = constant.hm.GET
+    api_types = ['article_baidu']
+    task_types = [constant.kw.SCHEDULE]
+    article = None
+
+    async def _before(self, session):
+        self.data = {
+            "type": "all",
+            "search": "",
+            "page": 1,
+            "pagesize": 20
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json[constant.error.ERRNO] == 0:
+            if len(text_json["data"]["list"]) > 0:
+                sel_article = random.choice([at
+                                             for at in self.config.record.memo.article_list
+                                             if not at["video"]])
+                self.task.info(f"choose nid={sel_article}")
+                filter_article_map = {at["nid"]: at
+                                      for at in text_json["data"]["list"]
+                                      if at["article_state"] == "publish"}
+                for sel_article in [at
+                                    for at in self.config.record.memo.article_list
+                                    if not at["video"]]:
+                    if sel_article["id"] in filter_article_map:
+                        self.config.generate_video = Munch(filter_article_map[sel_article["id"]])
+                        sel_article["video"] = True
+                        record.update_record(self.config.record)
+                        return True
+
+                return False
+            else:
+                return False
+        else:
+            self.task.error(text_json[constant.error.ERRMSG])
+            return False
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("createvideo")
+
+
+class CreateVideoApi(AbstractApi):
+    url = "https://aigc.baidu.com/aigc/saas/pc/v1/assist/createVideo"
+    method = constant.hm.POST_JSON
+    api_types = ['article_baidu']
+    task_types = [constant.kw.SCHEDULE]
+
+    async def _before(self, session):
+        self.data = {
+            "nid": self.config.generate_video.nid
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json[constant.error.ERRNO] == 0:
+            self.config.generate_video.update(text_json["data"])
+            return True
+        else:
+            self.task.error(text_json[constant.error.ERRMSG])
+            return False
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("taskstatus")
+
+
+class TaskStatusApi(AbstractApi):
+    url = "https://aigc.baidu.com/aigc/saas/pc/v1/assist/taskstatus"
+    method = constant.hm.GET
+    api_types = ['article_baidu']
+    task_types = [constant.kw.SCHEDULE]
+
+    async def _before(self, session):
+        await asyncio.sleep(150)
+        self.data = {
+            "id": self.config.generate_video.task_id
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json[constant.error.ERRNO] == 0:
+            return text_json["data"]["percent"] == 100
+        else:
+            self.task.error(text_json[constant.error.ERRMSG])
+            return False
+
+    def fail(self) -> Optional[InvokeInfo]:
+        return InvokeInfo(self.api_name)
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("getvideo")
+
+
+class GetVideoApi(AbstractApi):
+    url = "https://aigc.baidu.com/aigc/saas/pc/v1/assist/getTtv"
+    method = constant.hm.GET
+    api_types = ['article_baidu']
+    task_types = [constant.kw.SCHEDULE]
+
+    async def _before(self, session):
+        self.data = {
+            "ttvid": self.config.generate_video.task_id
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json[constant.error.ERRNO] == 0:
+            self.config.generate_video.update(text_json["data"])
+            return True
+        else:
+            self.task.error(text_json[constant.error.ERRMSG])
+            return False
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("savedraft")
+
+
+class SaveDraftApi(AbstractApi):
+    url = "https://aigc.baidu.com/aigc/saas/pc/v1/draft/save"
+    method = constant.hm.POST_DATA
+    api_types = ['article_baidu']
+    task_types = [constant.kw.SCHEDULE]
+
+    async def _before(self, session):
+        for material in self.config.generate_video.timeline["materialList"]:
+            material["mid"] = str(uuid.uuid1())
+
+        self.config.generate_video.videoParam["videoCoverImage"] = (
+            self.config.generate_video.timeline["materialList"][0]["thumbnail"]
+        )
+        self.config.generate_video.ext["pre_task_id"] = self.config.generate_video.task_id
+
+        content = {
+            "timeline": self.config.generate_video.timeline,
+            "originalTtvId": self.config.generate_video.task_id,
+            "sourceFrom": "saas_pc_ttv",
+            "template": self.config.generate_video.templateUrsa,
+            "templateParam": self.config.generate_video.templateParam,
+            "videoParam": self.config.generate_video.videoParam,
+            "ext": self.config.generate_video.ext,
+        }
+
+        duration = (self.config.generate_video.timeline["materialList"][-1]["start"] +
+                    self.config.generate_video.timeline["materialList"][-1]["duration"])
+
+        self.data = {
+            "data": json.dumps({
+                "backgroundImg": "",
+                "content": content,
+                "title": self.config.generate_video.videoParam["videoTitle"],
+                "coverImg": self.config.generate_video.videoParam["videoCoverImage"],
+                "sourceFrom": "saas_pc_ttv",
+                "ttvid": self.config.generate_video.task_id,
+                "duration": str(duration),
+                "version": 1,
+                "renderVersion": 2
+            })
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json[constant.error.ERRNO] == 0:
+            return True
+        else:
+            self.task.error(text_json[constant.error.ERRMSG])
+            return False
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("generatevideo")
+
+
+class GenerateVideoApi(AbstractApi):
+    url = "https://aigc.baidu.com/aigc/saas/pc/v1/assist/generateVideo"
+    method = constant.hm.POST_DATA
+    api_types = ['article_baidu']
+    task_types = [constant.kw.SCHEDULE]
+
+    async def _before(self, session):
+        self.data = {
+            "data": json.dumps({
+                "timeline": self.config.generate_video.timeline,
+                "originalTtvId": self.config.generate_video.task_id,
+                "sourceFrom": "saas_pc_ttv",
+                "template": self.config.generate_video.templateUrsa,
+                "templateParam": self.config.generate_video.templateParam,
+                "videoParam": self.config.generate_video.videoParam,
+                "ext": self.config.generate_video.ext,
+                "renderVersion": 2
+            })
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json[constant.error.ERRNO] == 0:
+            return True
+        else:
+            if text_json[constant.error.ERRNO] == 410100024:
+                self.config.record.params.generate = False
+                record.update_record(self.config.record)
+            self.task.error(text_json[constant.error.ERRMSG])
+            return False
+
+
+class TTVListApi(AbstractApi):
+    url = "https://aigc.baidu.com/aigc/saas/pc/v1/assist/getTTVList"
+    method = constant.hm.GET
+    api_types = ['article_baidu']
+    task_types = [constant.kw.SCHEDULE]
+
+    async def _before(self, session):
+        self.data = {
+            "page": 1,
+            "pagesize": 10,
+            "status": "unpublished"
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json[constant.error.ERRNO] == 0:
+            ttv_list = [ttv for ttv in text_json["data"]["articles"] if ttv["mediaid"]]
+            if len(ttv_list) > 0:
+                self.config.ttv = random.choice(ttv_list)
+                return True
+            else:
+                self.config.ttv = None
+                return False
+        else:
+            self.task.error(text_json[constant.error.ERRMSG])
+            return False
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("videoprocess")
+
+
+class VideoProcess(AbstractApi):
+    url = "https://baijiahao.baidu.com/pcui/video/process"
+    method = constant.hm.GET
+    api_types = ['article_baidu']
+    task_types = [constant.kw.SCHEDULE]
+    img_frame = None
+
+    async def _before(self, session):
+        self.data = {
+            "mediaId": self.config.ttv["mediaid"]
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json[constant.error.ERRNO] == 0:
+            img_frame_list = text_json["data"]["img_frame"]
+            if len(img_frame_list) == 0:
+                return False
+            self.img_frame = img_frame_list[0]
+            self.config.ttv["video_process"] = text_json["data"]
+            return True
+        else:
+            self.task.error(text_json[constant.error.ERRMSG])
+            return False
+
+    async def post(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+        if self.img_frame:
+            self.config.ttv["cover"] = Munch()
+            self.config.ttv["cover"].request_url = self.img_frame
+            self.config.ttv["cover"].path = f"{self.task.opt.image_path}{os.sep}article"
+            return InvokeInfo("commonimage", self.config.ttv["cover"])
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("processproxy")
+
+
+class ProcessProxyApi(AbstractApi):
+    url = "https://baijiahao.baidu.com/pcui/picture/processproxy"
+    method = constant.hm.POST_DATA
+    api_types = ['article_baidu']
+    task_types = [constant.kw.SCHEDULE]
+
+    async def _before(self, session):
+        with open(self.config.ttv["cover"].image_path, "rb") as f:
+            base64_img = base64.b64encode(f.read()).decode()
+            self.data = {
+                "action[0]": "save",
+                "base64": base64_img
+            }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json[constant.error.ERRNO] == 0:
+            self.config.ttv["cover"].update(text_json["ret"])
+            return True
+        else:
+            self.task.error(text_json[constant.error.ERRMSG])
+            return False
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("cuttingpicproxy")
+
+
+class CuttingPicProxyApi(AbstractApi):
+    url = "https://baijiahao.baidu.com/pcui/Picture/CuttingPicproxy"
+    method = constant.hm.POST_DATA
+    api_types = ['article_baidu']
+    task_types = [constant.kw.SCHEDULE]
+
+    async def _before(self, session):
+        rect_info = cut_rect(w=self.config.ttv["cover"].w,
+                             h=self.config.ttv["cover"].h,
+                             scale=(16, 9))
+        self.data = {
+            "x": rect_info.x,
+            "y": rect_info.y,
+            "w": rect_info.w,
+            "h": rect_info.h,
+            "src": self.config.ttv["cover"].url,
+            "type": "video"
+        }
+        self.config.ttv["cover"].rect = rect_info
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json[constant.error.ERRNO] == 0:
+            self.config.ttv["cover"].update(text_json["data"])
+            return True
+        else:
+            self.task.error(text_json[constant.error.ERRMSG])
+            return False
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("publishvideo")
+
+
+class PublishVideoApi(AbstractApi):
+    url = "https://baijiahao.baidu.com/pcui/article/publish?callback=bjhpublish"
+    method = constant.hm.POST_DATA
+    api_types = ['article_baidu']
+    task_types = [constant.kw.SCHEDULE]
+
+    async def pre(self) -> Union[List[InvokeInfo], Optional[InvokeInfo]]:
+        return InvokeInfo("videotasksystem")
+
+    async def _before(self, session):
+        self.data = {
+            "video_duration": self.config.ttv["videoDuration"],
+            "usingImgFilter": "false",
+            "type": "video",
+            "ttvid": self.config.ttv["ttvid"],
+            "title": self.config.ttv["title"],
+            "source_reprinted_allow": 0,
+            "order_id": "",
+            "nryx_mount_list": "",
+            "is_consultant_card": 0,
+            "image_edit_point": '[{"img_type":"cover","img_num":{"template":0,"font":0,"filter":0,"paster":0,"cut":1,'
+                                '"any":1}},{"img_type":"body","img_num":{"template":0,"font":0,"filter":0,"paster":0,'
+                                '"cut":0,"any":0}}]',
+            "fe_from": "BJH_CMS_PC",
+            "ducut_info": "",
+            "desc": self.config.ttv["title"],
+            "cover_source": "upload",
+            "cover_layout": "one",
+            "cover_images": json.dumps(
+                [{
+                    "source": "local",
+                    "src": self.config.ttv["cover"].src,
+                    "cropData": {
+                        "x": self.config.ttv["cover"].rect.x,
+                        "y": self.config.ttv["cover"].rect.y,
+                        "width": self.config.ttv["cover"].rect.w,
+                        "height": self.config.ttv["cover"].rect.h,
+                        "rotate": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                    },
+                    "isLegal": 0}]
+            ),
+            "content": json.dumps([
+                {
+                    "title": self.config.ttv["title"],
+                    "mediaId": self.config.ttv["mediaid"],
+                    "videoName": None,
+                    "local": 1,
+                    "desc": self.config.ttv["title"]}
+            ]),
+            "clue": "",
+            "bjhtopic_info": "",
+            "bjhtopic_id": "",
+            "bjhmt": "",
+            "bjh_video_finger_printing": json.dumps(
+                {
+                    "s2l": None,
+                    "s2game": None,
+                    "bjh":
+                        {
+                            "duration": self.config.ttv["videoDuration"]
+                        }
+                }
+            ),
+            "auto_mount_goods": "",
+            "auto_generate_id": self.config.ttv["nid"],
+            "aigc_type": 4,
+            "aigc_rebuild": "",
+            "aigc_channel": "",
+            "activity_list[0][id]": "reward",
+            "activity_list[0][is_checked]": 1,
+        }
+
+        if self.config.ttv.setdefault("task", None):
+            self.data["activity_list[1][id]"] = f"task_{self.config.ttv['task']['id']}"
+            self.data["activity_list[1][is_checked]"] = 1
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json["errno"] == 0:
+            return True
+        else:
+            return False
+
+
+class VideoTaskSystemApi(AbstractApi):
+    url = "https://baijiahao.baidu.com/author/eco/tasksystem/getSquareMissionList"
+    method = constant.hm.GET
+    api_types = ['article_baidu']
+    task_types = [constant.kw.SCHEDULE]
+
+    async def _before(self, session):
+        self.data = {
+            "page_no": 1,
+            "article_type": 2,
+            "page_size": 18,
+            "task_attend": 1,
+            "task_origin": "market",
+            "task_type": -1
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        text_json = json.loads(text)
+        if text_json["errno"] == 0:
+            task_list = [task for task in text_json["data"]["list"] if task["has_perm"] == 1]
+            task_list = SortedKeyList(iterable=task_list, key=lambda task: task["remain_time"])
+            if len(task_list) > 0:
+                self.config.ttv["task"] = task_list[-1]
+            return True
+        else:
+            return False

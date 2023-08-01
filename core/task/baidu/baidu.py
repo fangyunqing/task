@@ -69,9 +69,9 @@ class QuestionScheduleTask(ScheduleTask):
         "approval_treasure": True
     })
 
-    repeat_time = 180
+    repeat_time = 450
 
-    non_execution = range(2, 6)
+    non_execution = [0, 1, 2, 3, 4, 5, 6, 7, 23, 12]
 
 
 class ArticleScheduleTask(ScheduleTask):
@@ -84,16 +84,20 @@ class ArticleScheduleTask(ScheduleTask):
 
     config = Munch()
 
-    start_hour = 6
+    start_hour = 8
 
-    repeat_time = 180
+    repeat_time = 1200
 
 
 class AskScheduleTask(ScheduleTask):
+
+    # first_api_name = "orderlist"
 
     api_types = ["ask_baidu"]
 
     login_name = "baidu"
 
     config = Munch()
+
+    repeat_time = 300
 

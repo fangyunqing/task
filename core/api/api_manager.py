@@ -9,6 +9,7 @@ from typing import Type, List, Dict
 
 from munch import Munch
 
+from core import constant
 from core.api import Api
 from core.api.api import api_cls_list
 
@@ -40,7 +41,8 @@ class ApiManager:
     def get_apis(self, task_type: str, api_type: str) -> Dict[str, Type[Api]]:
         apis: Dict[str, Type[Api]] = {}
         for _ in self._apis:
-            if task_type in _.task_types and api_type in _.api_types:
+            if ((task_type in _.task_types or constant.kw.ALL in _.task_types)
+                    and (api_type in _.api_types or constant.kw.ALL in _.api_types)):
                 apis[_.api_name] = _
         return apis
 

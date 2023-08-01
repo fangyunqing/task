@@ -388,12 +388,13 @@ class LoginApi(AbstractApi):
                           fuid=init_data["fuid"],
                           trace_id=True)
         self.data[constant.kw.CALLBACK] = "parent." + random_callback("bd__pcbs__??????")
+        self.data["tpl"] = "mn"
 
     async def _after(self, response: ClientResponse, session) -> bool:
         text = await response.text()
         p = re.compile(r'.+(?<=href \+=)\s*"(.+)"')
         r = p.findall(text)
-        res = {}
+        res = Munch()
         for var1 in r[0].split("&"):
             var2 = list(var1.split("="))
             if len(var2) == 1:
@@ -417,6 +418,8 @@ class LoginApi(AbstractApi):
     def fail(self) -> Optional[InvokeInfo]:
         if self.err_no == "6":
             return InvokeInfo("getstyle", Munch({"action": "send"}))
+        elif self.err_no in ["400031"]:
+            return InvokeInfo("auth")
         elif self.err_no == "120021":
             return InvokeInfo("authwidgetverify", Munch({"action": "send"}))
 
@@ -693,3 +696,121 @@ class WenUserDataApi(AbstractApi):
         else:
             self.task.error(text_json[constant.error.ERRMSG])
             return False
+
+
+class AuthApi(AbstractApi):
+    url = "https://passport.baidu.com/v3/api/auth/widget?bankcheck=1"
+    method = constant.hm.POST_DATA
+    api_types = ['baidu']
+    task_types = [constant.kw.LOGIN]
+    res = None
+
+    async def _before(self, session):
+        self.data = {
+            "tpl": "pp",
+            "client": "",
+            "clientfrom": "pc",
+            "authid": self.config.login_response.authid,
+            "action": "get",
+            "authScene": "login_protect_verify",
+            "authParams": '{"supportThirdList":[]}',
+            "staticPage": "https://www.baidu.com/cache/user/html/v3Jump.html",
+            "charset": "UTF-8",
+            constant.kw.CALLBACK: f'parent.{random_callback("bd__pcbs__??????")}',
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        text = await response.text()
+        p = re.compile(r'.+(?<=document.location.replace\(decodeURIComponent\()"(.+)"')
+        r = p.findall(text)
+        self.res = Munch()
+        for var1 in r[0].split("&"):
+            var2 = list(var1.split("="))
+            if len(var2) == 1:
+                self.res[var2[0]] = None
+            elif len(var2) == 2:
+                self.res[var2[0]] = parse.unquote(var2[1])
+        return True
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("checkauth")
+
+
+class CheckAuthApi(AbstractApi):
+    url = "https://passport.baidu.com/v3/api/auth/widget"
+    method = constant.hm.POST_DATA
+    api_types = ['baidu']
+    task_types = [constant.kw.LOGIN]
+
+    async def _before(self, session):
+        self.data = {
+            "tpl": "pp",
+            "client": "",
+            "clientfrom": "pc",
+            "authid": self.config.login_response.authid,
+            "authField": "mobile",
+            "authType": "check",
+            "action": "send",
+            "sup624": 1,
+            "authParams": '{"banktype":"","type":"vcode","secret":""}',
+            "staticPage": "https://www.baidu.com/cache/user/html/v3Jump.html",
+            "charset": "UTF-8",
+            constant.kw.CALLBACK: f'parent.{random_callback("bd__pcbs__??????")}',
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        return True
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("sendauth")
+
+
+class SendAuthApi(AbstractApi):
+    url = "https://passport.baidu.com/v3/api/auth/widget"
+    method = constant.hm.POST_DATA
+    api_types = ['baidu']
+    task_types = [constant.kw.LOGIN]
+
+    async def _before(self, session):
+        vcode = await aioconsole.ainput('请输入验证码:')
+        self.data = {
+            "tpl": "pp",
+            "client": "",
+            "clientfrom": "pc",
+            "authid": self.config.login_response.authid,
+            "authField": "mobile",
+            "authType": "check",
+            "action": "check",
+            "authParams": "{" + f'"vcode":"{vcode}","bankCardType":"","type":"vcode","secret":""' + "}",
+            "staticPage": "https://www.baidu.com/cache/user/html/v3Jump.html",
+            "charset": "UTF-8",
+            constant.kw.CALLBACK: f'parent.{random_callback("bd__pcbs__??????")}',
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        return True
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("loginproxy")
+
+
+class LoginProxyApi(AbstractApi):
+    url = None
+    method = constant.hm.GET
+    api_types = ['baidu']
+    task_types = [constant.kw.LOGIN]
+
+    async def _before(self, session):
+        self.url = self.config.login_response.loginproxy
+        self.data = {
+            "apiver": "v3",
+            "tt": thirteen_digits_time(),
+            constant.kw.CALLBACK: random_callback("bd__pcbs__??????"),
+
+        }
+
+    async def _after(self, response: ClientResponse, session) -> bool:
+        return True
+
+    def success(self) -> Optional[InvokeInfo]:
+        return InvokeInfo("logininfo")

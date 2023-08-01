@@ -18,3 +18,5 @@ CALLBACK = "callback"
 UA = "User-Agent"
 
 MISSING = "missing"
+
+ALL = "all"

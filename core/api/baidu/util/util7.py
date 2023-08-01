@@ -2,6 +2,7 @@ import json
 import math
 from random import random, randint
 
+from core.util import js_displace
 from core.util.time import thirteen_digits_time
 
 import base64
@@ -57,7 +58,7 @@ def jt():
         "i": "0",
         "tn": tdt,
         "tj": tdt,
-        "tp": str(thirteen_digits_time()),
+        "tp": str(tdt - 2000),
         "to": "5000",
         "v": "3.4.8",
         "j": f'188421f191810307c54207|'
@@ -84,26 +85,37 @@ def hvi(d: str):
         var3 = "C"
         var1.append(0)
 
+    src_len = len(var1)
     var4 = []
-    for idx in range(0, len(var1), 4):
+    var2 = len(var1) % 4
+    if var2 != 0:
+        for _ in range(0, 4 - var2):
+            var1.append(0)
+
+    for idx_idx, idx in enumerate(range(0, len(var1), 4)):
         var6 = []
         for v in var1[idx: idx + 4][::-1]:
             var6.append(hex(v)[2:])
-        var7 = hex(int("".join(var6), base=16) ^ _xor_key)[2:]
+        value = int("".join(var6), base=16)
+        if 4 * idx_idx + 4 <= src_len:
+            value = algorithm5(value, 3)
+
+        value = js_displace.unsigned_right_shift(value ^ _xor_key, 0)
+        var7 = hex(value)[2:]
+        for _ in range(0, 8 - len(var7)):
+            var7 = "0" + var7
         for _ in list(range(0, 4))[::-1]:
             var4.append(int(var7[_ * 2: _ * 2 + 2], base=16))
-    print(var4)
+        pass
 
-
-
-
-
-    # for v1, v2, v3 in var4:
-    #     res.append(_code_map[63 & v1])
-    #     res.append(_code_map[63 & v2])
-    #     res.append(_code_map[63 & v3])
-    #     res.append(_code_map[v1 >> 6 << 4 | v2 >> 6 << 2 | v3 >> 6])
-    # return "".join(res) + var3
+    var1 = var4[0: src_len]
+    res = []
+    for v1, v2, v3 in [var1[idx: idx + 3] for idx in range(0, len(var1), 3)]:
+        res.append(_code_map[63 & v1])
+        res.append(_code_map[63 & v2])
+        res.append(_code_map[63 & v3])
+        res.append(_code_map[v1 >> 6 << 4 | v2 >> 6 << 2 | v3 >> 6])
+    return "".join(res) + var3
 
 
 def verify_info():
@@ -203,5 +215,9 @@ def algorithm4(d: str, c: int):
     return res
 
 
-print(hvi('{"a":568,"b":528,"c":990,"d":911,"m":"refreshAgin"}'))
+def algorithm5(d1: int, d2: int):
+    return js_displace.unsigned_right_shift(
+        js_displace.unsigned_right_shift(d1, d2) | js_displace.left_shift(d1, 32 - d2),
+        0)
+
 

@@ -10,7 +10,7 @@ import ctypes
 
 def unsigned_right_shift(n, i):
     def int_overflow(val):
-        maxint = 2147483647
+        maxint = 9223372036854775807
         if not -maxint - 1 <= val <= maxint:
             val = (val + (maxint + 1)) % (2 * (maxint + 1)) - maxint - 1
         return val

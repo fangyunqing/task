@@ -9,5 +9,7 @@ modules = [
     "core.task.baidu.baidu",
     "core.api.baidu.baidu",
     "core.api.baidu.question",
-    "core.api.baidu.article"
+    "core.api.baidu.article",
+    "core.api.baidu.ask",
+    "core.api.common"
 ]
